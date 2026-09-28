@@ -1,13 +1,12 @@
 package br.com.leotricano.sistemasalao.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 public class Servico {
@@ -24,10 +23,17 @@ public class Servico {
     @NotNull
     private BigDecimal preco;
 
+    @ManyToMany(mappedBy = "servicos")
+    private Set<Profissional> profissionais = new HashSet<>();
+
     protected Servico() {}
 
     public String getNome() {
         return nome;
+    }
+
+    public Set<Profissional> getProfissionais() {
+        return profissionais;
     }
 
     public void setNome(String nome) {

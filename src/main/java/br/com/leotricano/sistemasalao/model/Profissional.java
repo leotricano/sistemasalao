@@ -1,10 +1,10 @@
 package br.com.leotricano.sistemasalao.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 public class Profissional {
@@ -18,6 +18,14 @@ public class Profissional {
 
     @NotBlank
     private String especialiadade;
+
+    @ManyToMany
+    @JoinTable(
+            name = "profissional_servico",
+            joinColumns = @JoinColumn(name = "profissional_id"),
+            inverseJoinColumns = @JoinColumn(name = "servico_id")
+    )
+    private Set<Servico> servicos = new HashSet<>();
 
     protected Profissional(){}
 
@@ -43,5 +51,9 @@ public class Profissional {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public Set<Servico> getServicos() {
+        return servicos;
     }
 }
