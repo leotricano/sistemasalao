@@ -27,7 +27,7 @@ public class ItemAgendamento {
     @NotNull
     private BigDecimal precoCobrado;
 
-    protected ItemAgendamento(){}
+    public ItemAgendamento(){}
 
     public Long getId() {
         return id;

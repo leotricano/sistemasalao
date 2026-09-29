@@ -5,6 +5,7 @@ import br.com.leotricano.sistemasalao.repository.ClienteRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 //Service = o tratamento dos dados.
 @Service
 public class ClienteService {
@@ -20,6 +21,24 @@ public class ClienteService {
     }
 
     public Cliente salvar(Cliente cliente) {
+        return clienteRepository.save(cliente);
+    }
+    public void deletar(Long id) {
+        clienteRepository.deleteById(id);
+    }
+
+    public Cliente atualizar(Long id, Cliente dadosNovos) {
+        Optional<Cliente> clienteExistente = clienteRepository.findById(id);
+
+        if (clienteExistente.isEmpty()) {
+            return null;
+        }
+
+        Cliente cliente = clienteExistente.get();
+        cliente.setNome(dadosNovos.getNome());
+        cliente.setEmail(dadosNovos.getEmail());
+        cliente.setTelefone(dadosNovos.getTelefone());
+
         return clienteRepository.save(cliente);
     }
 }
