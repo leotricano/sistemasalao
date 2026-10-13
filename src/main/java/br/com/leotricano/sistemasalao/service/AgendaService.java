@@ -75,6 +75,17 @@ public class AgendaService {
         Servico servico = servicoOpt.get();
         Profissional profissional = profissionalOpt.get();
 
+        boolean profissionalFazOServico = false;
+
+        for (Servico s : profissional.getServicos() ) {
+            if (s.getId().equals(servico.getId())) {
+                profissionalFazOServico = true;
+            }
+        }
+
+        if (!profissionalFazOServico) {
+            return null;
+        }
         ItemAgendamento item = new ItemAgendamento();
         item.setAgenda(agenda);
         item.setServico(servico);
