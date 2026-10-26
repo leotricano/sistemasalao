@@ -332,7 +332,7 @@ function livre(profId,dia,ini,dur,ignore){
 function formaAleatoria(){const r=rng();return r<.45?'PIX':r<.85?'CARTAO':'DINHEIRO'}
 for(let d=-75;d<=7;d++){
   const dia=addDays(TODAY,d),wd=dia.getDay();
-  if(d!==0&&(wd===0||wd===1))continue;
+  if(d!==0&&wd===0)continue;
   const alvo=d<0?5+Math.floor(rng()*4):d===0?8:2+Math.floor(rng()*4);
   let n=0;
   for(let t=0;t<30&&n<alvo;t++){
@@ -494,7 +494,7 @@ function gradeDia(d,lista){
   const HP=60;const k=key(d);
   let h='<div class="cal-scroll"><div class="cal" style="--cols:'+lista.length+';--hp:'+HP+'px"><div class="cal-h"></div>'+lista.map(p=>`<div class="cal-h">${pchip(p)}<div class="muted" style="font-weight:400;font-size:.78rem">${p.esp}</div></div>`).join('');
   h+='<div class="ruler">'+[...Array(10)].map((_,i)=>`<span class="mono" style="top:${i*HP}px">${hm(ABRE+i*60)}</span>`).join('')+'</div>';
-  const fechado=(d.getDay()===0||d.getDay()===1);
+  const fechado=d.getDay()===0;
   lista.forEach(p=>{
     h+='<div class="col">';
     if(fechado)h+='<p class="closed">Salão fechado</p>';
@@ -511,7 +511,7 @@ function gradeSemana(d,lista){
   const ids=lista.map(p=>p.id);
   return '<div class="cal-scroll"><div class="week">'+semana(d).map(x=>{
     const l=ags.filter(a=>ids.includes(a.profId)&&key(a.dia)===key(x)).sort((a,b)=>a.ini-b.ini);
-    const fechado=(x.getDay()===0||x.getDay()===1)&&!l.length;
+    const fechado=x.getDay()===0&&!l.length;
     return `<div class="wd"><div class="wd-h ${key(x)===key(TODAY)?'today':''}"><span>${fd(x,{weekday:'short'})}</span><b>${x.getDate()}</b></div><div class="wd-b">${
       fechado?'<span class="closed">Fechado</span>':l.map(a=>`<button class="chip ${a.status}" style="${pcVars(pf(a.profId))}" data-go="detalhe" data-id="${a.id}"><b>${hm(a.ini)}</b> ${esc(cl(a.clienteId).nome.split(' ')[0])}<br><span class="muted">${esc(sv(a.servicoId).nome)}</span></button>`).join('')||'<span class="closed">Livre</span>'
     }</div></div>`}).join('')+'</div></div>';
@@ -519,7 +519,7 @@ function gradeSemana(d,lista){
 
 function slotsHTML(profId,servId,dateK,sel,ignore,act){
   const s=sv(servId),dia=fromKey(dateK),hoje=dateK===key(TODAY);
-  if(dia.getDay()===0||dia.getDay()===1)return '<p class="note">O salão não abre aos domingos e segundas. Escolha outra data.</p>';
+  if(dia.getDay()===0)return '<p class="note">O salão não abre aos domingos. Escolha outra data.</p>';
   let h='<div class="slots">',livres=0;
   for(let t=ABRE;t+s.dur<=FECHA;t+=30){
     const ok=livre(profId,dia,t,s.dur,ignore)&&!(hoje&&t<NOW_MIN);
