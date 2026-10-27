@@ -131,7 +131,7 @@ erDiagram
 | DELETE | `/profissionais/{id}` | Remove profissional |
 | POST | `/profissionais/{id}/servicos/{servicoId}` | Vincula um serviço ao profissional |
 | DELETE | `/profissionais/{id}/servicos/{servicoId}` | Desvincula um serviço |
-| GET | `/agendas` | Lista agendamentos |
+| GET | `/agendas?de=&ate=&profissionalId=&status=` | Lista agendamentos em ordem de horário; todos os filtros são opcionais (ver [Consulta da agenda](#consulta-da-agenda-15)) |
 | GET | `/agendas/{id}` | Detalhe do agendamento, com itens, término, duração e total |
 | POST | `/agendas` | Cria agendamento, sempre como AGENDADO (`{"cliente":{"id":1},"dataHora":"2026-11-03T14:00:00"}`) |
 | PUT | `/agendas/{id}/status` | Conclui, cancela ou reativa (corpo: `"CONCLUIDO"`, `"CANCELADO"` ou `"AGENDADO"`) |
@@ -186,6 +186,29 @@ Toda agenda nasce **AGENDADO**, mesmo que o JSON mande outro status.
 | Remarcar | só AGENDADO, data no futuro, horário livre | 400 / 409 |
 | Incluir ou remover serviço | só em agenda AGENDADA | 400 |
 
+### Consulta da agenda (#15)
+
+`GET /agendas` aceita filtros opcionais, que podem ser combinados. O resultado vem sempre **ordenado por horário**, como na grade da agenda.
+
+| Chamada | Devolve |
+|---|---|
+| `GET /agendas` | tudo (sem filtro) |
+| `GET /agendas?de=2026-11-03&ate=2026-11-03` | o dia 03/11 |
+| `GET /agendas?de=2026-11-02&ate=2026-11-08` | a semana de 02 a 08/11 |
+| `GET /agendas?de=2026-11-02&ate=2026-11-08&profissionalId=2` | só as agendas em que algum serviço é com o profissional 2 |
+| `GET /agendas?de=2026-11-02&ate=2026-11-08&status=AGENDADO` | só um status (ex.: esconder os cancelados) |
+
+| Regra | Erro |
+|---|---|
+| `de` e `ate` são dias inteiros e os dois entram (`de=03/11&ate=03/11` = 03/11 das 00:00 às 23:59) | — |
+| Informar só uma das datas | 400 |
+| `de` depois de `ate` | 400 |
+| Período maior que 62 dias | 400 |
+| Data fora do formato `aaaa-mm-dd` ou status inexistente | 400 |
+| Profissional que não existe | 404 (e não lista vazia, que pareceria "dia livre") |
+
+A API recebe um **período**, e não "dia" ou "semana": quem decide se a semana começa no domingo ou na segunda é o frontend. Assim o mesmo endpoint serve para dia, semana e, depois, o mês do relatório.
+
 ### Regras de negócio já implementadas
 - Um item só é aceito se o profissional **faz** aquele serviço (vínculo em `profissional_servico`).
 - O preço do serviço é **copiado** para `precoCobrado` no momento do agendamento, para que um reajuste futuro não altere atendimentos antigos.
@@ -216,6 +239,7 @@ Toda agenda nasce **AGENDADO**, mesmo que o JSON mande outro status.
 | #12 | Bloqueio de conflito de horário por profissional, com resposta 409 | RF03 |
 | #13 | Tratamento de erros: exceções nos services, `TratadorDeErros` e formato único de erro | — |
 | #14 | Cancelar, reativar e remarcar, com regras de mudança de status | RF08 |
+| #15 | Consulta da agenda por período (dia, semana), profissional e status, em ordem de horário | RF04 |
 
 ## O que vamos fazer
 
@@ -226,7 +250,7 @@ Toda agenda nasce **AGENDADO**, mesmo que o JSON mande outro status.
 
 ### Sprint 2 (03/11 a 09/11)
 - [x] **#14** Cancelar e remarcar agendamento (RF08)
-- [ ] **#15** Consultar agenda por dia, semana e profissional (RF04)
+- [x] **#15** Consultar agenda por dia, semana e profissional (RF04)
 - [ ] **#16** Histórico de atendimentos do cliente (RF06)
 - [ ] **#28** Vários serviços por agendamento, começando pelo profissional (RF03 alterado)
 - [ ] **#29** Especialidade com pacote de serviços padrão (RF09)
@@ -259,6 +283,7 @@ Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp 
 | **Concluir sem pagamento é permitido** | O cliente pode pagar depois. Se o salão quiser exigir pagamento antes de concluir, é uma verificação a mais em `AgendaService.atualizarStatus`. |
 | **Cancelar com pagamento é bloqueado** | Evita agenda cancelada contando no faturamento. Para cancelar, o pagamento precisa ser removido antes (estorno ainda não existe). |
 | **Cancelar em vez de apagar** | `DELETE /agendas/{id}` é para corrigir lançamento errado. Para desmarcar, o certo é cancelar, que mantém o histórico do cliente. |
+| **Filtros opcionais numa só consulta JPQL** | Cada filtro é `(:x is null or ...)`: quando o parâmetro não vem, a condição é ignorada. O `cast(:x as Tipo)` é necessário porque o PostgreSQL não descobre sozinho o tipo de um parâmetro em `? is null`. |
 | **Erro 500 sem detalhes** | O stack trace vai só para o log da aplicação; mandá-lo para quem chamou a API exporia o funcionamento interno. |
 | **Monolito em camadas** | Projeto de pequeno porte e desenvolvedor único; microsserviços trariam complexidade sem benefício (Tarefa 2). |
 

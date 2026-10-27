@@ -6,14 +6,16 @@ import br.com.leotricano.sistemasalao.model.Agenda;
 import br.com.leotricano.sistemasalao.model.StatusAgendamento;
 import br.com.leotricano.sistemasalao.service.AgendaService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Endpoints de {@code /agendas}: agendamentos e os serviços dentro de cada um (RF03), cancelar e
- * remarcar (RF08).
+ * Endpoints de {@code /agendas}: consulta por período e profissional (RF04), agendamentos e os
+ * serviços dentro de cada um (RF03), cancelar e remarcar (RF08).
  * Todas as respostas usam {@link AgendaResponse}, que já traz itens, término, duração total e
  * valor total. Os erros (404, 400, 409) vêm do service e são montados pelo {@code TratadorDeErros}.
  */
@@ -28,12 +30,30 @@ public class AgendaController {
     }
 
     /**
-     * {@code GET /agendas} → lista todos os agendamentos.
-     * TODO(#15): filtros por dia, semana e profissional (RF04).
+     * {@code GET /agendas} → lista os agendamentos em ordem de horário (#15, RF04). Todos os
+     * filtros são opcionais e podem ser combinados:
+     * <ul>
+     *   <li>{@code ?de=2026-11-03&ate=2026-11-03} → o dia 03/11;</li>
+     *   <li>{@code ?de=2026-11-02&ate=2026-11-08} → a semana;</li>
+     *   <li>{@code &profissionalId=2} → só agendas com algum serviço desse profissional;</li>
+     *   <li>{@code &status=AGENDADO} → só esse status (ex.: esconder os cancelados).</li>
+     * </ul>
+     * Sem filtro nenhum, devolve tudo. {@code required = false} torna o parâmetro opcional
+     * (chega {@code null} quando não vem na URL), e {@code @DateTimeFormat(iso = DATE)} lê a data
+     * no formato {@code aaaa-mm-dd}.
+     * <ul>
+     *   <li>400 se só uma das datas vier, se {@code de} for depois de {@code ate}, se o período
+     *       passar de 62 dias ou se uma data/status estiver em formato inválido;</li>
+     *   <li>404 se o profissional não existir.</li>
+     * </ul>
      */
     @GetMapping
-    public List<AgendaResponse> listar() {
-        return agendaService.listarTodas().stream()
+    public List<AgendaResponse> listar(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate de,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate ate,
+            @RequestParam(required = false) Long profissionalId,
+            @RequestParam(required = false) StatusAgendamento status) {
+        return agendaService.listar(de, ate, profissionalId, status).stream()
                 .map(AgendaResponse::from)
                 .toList();
     }

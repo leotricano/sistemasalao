@@ -12,10 +12,44 @@ import java.util.List;
 
 /**
  * Acesso à tabela {@code agenda}.
- *
- * <p>TODO(#15): consultas por dia, semana e profissional para montar a tela de agenda (RF04).
  */
 public interface AgendaRepository extends JpaRepository<Agenda, Long> {
+
+    /**
+     * Consulta da tela de agenda (#15, RF04). Cada filtro é opcional: quando o parâmetro chega
+     * {@code null}, a condição {@code :x is null or ...} vira verdadeira e o filtro é ignorado.
+     * Assim uma única consulta atende "o dia", "a semana", "só o William", "só os agendados" e
+     * qualquer combinação deles.
+     * <ul>
+     *   <li>{@code inicio} / {@code fim}: agendas que começam a partir de {@code inicio} e antes de
+     *       {@code fim} ({@code fim} não entra: para o dia 03/11, o service manda
+     *       03/11 00:00 até 04/11 00:00);</li>
+     *   <li>{@code profissionalId}: agendas em que <b>algum</b> serviço é com esse profissional.
+     *       O {@code exists} com subconsulta evita repetir a agenda quando ele faz dois serviços
+     *       nela (o que aconteceria com {@code join});</li>
+     *   <li>{@code status}: só agendas nesse status.</li>
+     * </ul>
+     * Por que o {@code cast}: no SQL, {@code ? is null} sozinho não diz ao PostgreSQL de que tipo
+     * é o parâmetro, e ele recusa a consulta ("could not determine data type of parameter").
+     * O {@code cast} informa o tipo.
+     *
+     * <p>O resultado vem em ordem de horário, que é a ordem da grade da agenda; o {@code a.id}
+     * desempata duas agendas no mesmo horário, para a ordem não mudar entre uma chamada e outra.
+     */
+    @Query("""
+            select a from Agenda a
+            where (cast(:inicio as LocalDateTime) is null or a.dataHora >= :inicio)
+              and (cast(:fim as LocalDateTime) is null or a.dataHora < :fim)
+              and (cast(:status as String) is null or a.status = :status)
+              and (cast(:profissionalId as Long) is null or exists (
+                    select 1 from ItemAgendamento i
+                    where i.agenda = a and i.profissional.id = :profissionalId))
+            order by a.dataHora, a.id
+            """)
+    List<Agenda> buscarComFiltros(@Param("inicio") LocalDateTime inicio,
+                                  @Param("fim") LocalDateTime fim,
+                                  @Param("profissionalId") Long profissionalId,
+                                  @Param("status") StatusAgendamento status);
 
     /**
      * Agendas que <i>podem</i> conflitar com um horário (#12). Traz as agendas que:

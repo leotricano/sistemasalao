@@ -7,15 +7,17 @@ import br.com.leotricano.sistemasalao.model.*;
 import br.com.leotricano.sistemasalao.repository.*;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * Regras de agendamento: criar (RF03), incluir/remover serviços, mudar status, cancelar e
- * remarcar (RF08).
+ * Regras de agendamento: consultar por período e profissional (RF04), criar (RF03),
+ * incluir/remover serviços, mudar status, cancelar e remarcar (RF08).
  *
  * <p>Fluxo de uso hoje: primeiro {@link #criar} a agenda (cliente + data/hora), depois chamar
  * {@link #adicionarItem} uma vez para cada serviço.
@@ -41,6 +43,9 @@ public class AgendaService {
     private static final DateTimeFormatter DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
 
+    /** Maior período aceito em {@link #listar} (dois meses), para ninguém pedir anos de agenda de uma vez. */
+    private static final int MAXIMO_DIAS_CONSULTA = 62;
+
     private final AgendaRepository agendaRepository;
     private final ClienteRepository clienteRepository;
     private final ServicoRepository servicoRepository;
@@ -59,8 +64,51 @@ public class AgendaService {
         this.pagamentoRepository = pagamentoRepository;
     }
 
-    public List<Agenda> listarTodas() {
-        return agendaRepository.findAll();
+    /**
+     * Lista as agendas para a tela de agenda (#15, RF04). Todos os filtros são opcionais e podem
+     * ser combinados; sem nenhum, devolve todas as agendas. O resultado vem ordenado por horário.
+     *
+     * <p>O período é de dias inteiros: {@code de=03/11, ate=03/11} é o dia 03/11 todo, e
+     * {@code de=02/11, ate=08/11} é a semana. A API não decide o que é "dia" ou "semana";
+     * quem chama manda o período, e o mesmo método serve para o mês do relatório depois.
+     *
+     * @param de             primeiro dia do período (inclusive) ou {@code null}
+     * @param ate            último dia do período (inclusive) ou {@code null}
+     * @param profissionalId só agendas com algum serviço desse profissional, ou {@code null}
+     * @param status         só agendas nesse status, ou {@code null}
+     * @throws RegraNegocioException (400) se só uma das datas for informada, se {@code de} for
+     *         depois de {@code ate} ou se o período passar de {@value #MAXIMO_DIAS_CONSULTA} dias
+     * @throws RecursoNaoEncontradoException (404) se o profissional informado não existir
+     */
+    public List<Agenda> listar(LocalDate de, LocalDate ate, Long profissionalId, StatusAgendamento status) {
+        // Só uma das datas não define um período; melhor avisar do que adivinhar
+        if ((de == null) != (ate == null)) {
+            throw new RegraNegocioException("Informe as duas datas do período: 'de' e 'ate'.");
+        }
+
+        LocalDateTime inicio = null;
+        LocalDateTime fim = null;
+        if (de != null) {
+            if (de.isAfter(ate)) {
+                throw new RegraNegocioException("A data 'de' precisa ser igual ou anterior à data 'ate'.");
+            }
+            // +1 porque os dois dias contam: de 03/11 até 03/11 é 1 dia, não 0
+            long dias = ChronoUnit.DAYS.between(de, ate) + 1;
+            if (dias > MAXIMO_DIAS_CONSULTA) {
+                throw new RegraNegocioException("O período pode ter no máximo " + MAXIMO_DIAS_CONSULTA
+                        + " dias (foram pedidos " + dias + ").");
+            }
+            // De 00:00 do primeiro dia até 00:00 do dia seguinte ao último (sem incluir esse instante)
+            inicio = de.atStartOfDay();
+            fim = ate.plusDays(1).atStartOfDay();
+        }
+
+        // Profissional inexistente dá 404, em vez de uma lista vazia que pareceria "dia livre"
+        if (profissionalId != null && !profissionalRepository.existsById(profissionalId)) {
+            throw new RecursoNaoEncontradoException("Profissional " + profissionalId + " não encontrado.");
+        }
+
+        return agendaRepository.buscarComFiltros(inicio, fim, profissionalId, status);
     }
 
     /**
