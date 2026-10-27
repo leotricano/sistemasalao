@@ -1,11 +1,11 @@
 package br.com.leotricano.sistemasalao.service;
 
+import br.com.leotricano.sistemasalao.exception.RecursoNaoEncontradoException;
 import br.com.leotricano.sistemasalao.model.Servico;
 import br.com.leotricano.sistemasalao.repository.ServicoRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Regras do cadastro de serviços do salão (RF02). Mesmo padrão do ClienteService.
@@ -27,7 +27,15 @@ public class ServicoService {
         return servicoRepository.save(servico);
     }
 
+    /**
+     * Remove o serviço.
+     *
+     * @throws RecursoNaoEncontradoException se o id não existir (404)
+     * @throws org.springframework.dao.DataIntegrityViolationException se o serviço estiver vinculado a
+     *         algum profissional ou já tiver sido usado em agendamentos (o TratadorDeErros responde 409)
+     */
     public void deletar(Long id) {
+        buscar(id);
         servicoRepository.deleteById(id);
     }
 
@@ -36,20 +44,20 @@ public class ServicoService {
      * Mudar o preço aqui não altera agendamentos já feitos: eles guardam o próprio
      * {@code precoCobrado} (ver ItemAgendamento).
      *
-     * @return o serviço atualizado, ou {@code null} se o id não existir
+     * @throws RecursoNaoEncontradoException se o id não existir (404)
      */
     public Servico atualizar(Long id, Servico dadosNovos) {
-        Optional<Servico> servicoExistente = servicoRepository.findById(id);
-
-        if (servicoExistente.isEmpty()) {
-            return null;
-        }
-
-        Servico servico = servicoExistente.get();
+        Servico servico = buscar(id);
         servico.setNome(dadosNovos.getNome());
         servico.setDuracaoMinutos(dadosNovos.getDuracaoMinutos());
         servico.setPreco(dadosNovos.getPreco());
 
         return servicoRepository.save(servico);
+    }
+
+    /** Busca pelo id ou lança 404 (ver ClienteService.buscar). */
+    private Servico buscar(Long id) {
+        return servicoRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço " + id + " não encontrado."));
     }
 }

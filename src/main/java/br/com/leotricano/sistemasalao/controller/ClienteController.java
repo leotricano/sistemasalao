@@ -12,6 +12,9 @@ import java.util.List;
  * Controller = a porta de entrada HTTP. Recebe a requisição, chama o service e devolve a resposta.
  * Não tem regra de negócio: só traduz entre HTTP/JSON e Java. Endpoints de {@code /clientes} (RF01).
  *
+ * <p>Erros (#13): os controllers não testam {@code null} nem fazem try/catch. Se o service lançar
+ * uma exceção (ex.: cliente não encontrado), o {@code TratadorDeErros} monta a resposta de erro.
+ *
  * <p>Este é o único controller que ainda devolve a entidade direto. Não dá loop porque o Cliente
  * não aponta para outras entidades. TODO: criar um ClienteResponse para manter o padrão.
  */
@@ -41,23 +44,16 @@ public class ClienteController {
         return clienteService.salvar(cliente);
     }
 
-    /** {@code DELETE /clientes/{id}} → remove e responde 204 (No Content). */
+    /** {@code DELETE /clientes/{id}} → remove e responde 204 (No Content); 404 se não existir, 409 se tiver agendamentos. */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) { // @PathVariable pega o {id} da URL
         clienteService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * {@code PUT /clientes/{id}} → atualiza os dados.
-     * {@code ResponseEntity} permite escolher o status HTTP: 200 com o cliente, ou 404 se não existir.
-     */
+    /** {@code PUT /clientes/{id}} → atualiza os dados; 404 se não existir. */
     @PutMapping("/{id}")
-    public ResponseEntity<Cliente> atualizar(@PathVariable Long id, @Valid @RequestBody Cliente dadosNovos) {
-        Cliente clienteAtualizado = clienteService.atualizar(id, dadosNovos);
-        if (clienteAtualizado == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(clienteAtualizado);
+    public Cliente atualizar(@PathVariable Long id, @Valid @RequestBody Cliente dadosNovos) {
+        return clienteService.atualizar(id, dadosNovos);
     }
 }

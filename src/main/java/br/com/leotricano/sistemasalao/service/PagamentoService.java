@@ -1,5 +1,7 @@
 package br.com.leotricano.sistemasalao.service;
 
+import br.com.leotricano.sistemasalao.exception.RecursoNaoEncontradoException;
+import br.com.leotricano.sistemasalao.exception.RegraNegocioException;
 import br.com.leotricano.sistemasalao.model.Agenda;
 import br.com.leotricano.sistemasalao.model.FormaPagamento;
 import br.com.leotricano.sistemasalao.model.Pagamento;
@@ -10,7 +12,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Registro dos pagamentos de cada agendamento (RF05). Estes registros são a base do
@@ -27,7 +28,9 @@ public class PagamentoService {
         this.agendaRepository = agendaRepository;
     }
 
+    /** @throws RecursoNaoEncontradoException se a agenda não existir (404), em vez de devolver lista vazia */
     public List<Pagamento> listarPorAgenda(Long agendaId) {
+        buscarAgenda(agendaId);
         return pagamentoRepository.findByAgendaId(agendaId);
     }
 
@@ -37,16 +40,19 @@ public class PagamentoService {
      *
      * <p>TODO: recusar valor que faça a soma dos pagamentos passar do total da agenda.
      *
-     * @return o pagamento salvo, ou {@code null} se a agenda não existir
+     * @throws RecursoNaoEncontradoException se a agenda não existir (404)
+     * @throws RegraNegocioException se o valor for zero ou negativo (400)
      */
     public Pagamento registrar(Long agendaId, BigDecimal valor, FormaPagamento formaPagamento) {
-        Optional<Agenda> agendaOpt = agendaRepository.findById(agendaId);
-        if (agendaOpt.isEmpty()) {
-            return null;
+        Agenda agenda = buscarAgenda(agendaId);
+
+        // compareTo em vez de "<=": BigDecimal é objeto e não aceita os operadores de comparação
+        if (valor.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RegraNegocioException("O valor do pagamento precisa ser maior que zero.");
         }
 
         Pagamento pagamento = new Pagamento();
-        pagamento.setAgenda(agendaOpt.get());
+        pagamento.setAgenda(agenda);
         pagamento.setValor(valor);
         pagamento.setFormaPagamento(formaPagamento);
         pagamento.setDataHora(LocalDateTime.now()); // o momento é decidido pelo servidor, não pelo cliente
@@ -54,7 +60,22 @@ public class PagamentoService {
         return pagamentoRepository.save(pagamento);
     }
 
-    public void deletar(Long id) {
-        pagamentoRepository.deleteById(id);
+    /**
+     * Remove um pagamento lançado errado. Confere se o pagamento é mesmo da agenda informada na URL,
+     * para que {@code DELETE /agendas/1/pagamentos/7} não apague um pagamento da agenda 2.
+     *
+     * @throws RecursoNaoEncontradoException se o pagamento não existir ou for de outra agenda (404)
+     */
+    public void deletar(Long agendaId, Long id) {
+        Pagamento pagamento = pagamentoRepository.findById(id)
+                .filter(p -> p.getAgenda().getId().equals(agendaId))
+                .orElseThrow(() -> new RecursoNaoEncontradoException(
+                        "Pagamento " + id + " não encontrado na agenda " + agendaId + "."));
+        pagamentoRepository.delete(pagamento);
+    }
+
+    private Agenda buscarAgenda(Long agendaId) {
+        return agendaRepository.findById(agendaId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agenda " + agendaId + " não encontrada."));
     }
 }

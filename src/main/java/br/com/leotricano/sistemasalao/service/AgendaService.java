@@ -1,6 +1,8 @@
 package br.com.leotricano.sistemasalao.service;
 
 import br.com.leotricano.sistemasalao.exception.ConflitoHorarioException;
+import br.com.leotricano.sistemasalao.exception.RecursoNaoEncontradoException;
+import br.com.leotricano.sistemasalao.exception.RegraNegocioException;
 import br.com.leotricano.sistemasalao.model.*;
 import br.com.leotricano.sistemasalao.repository.*;
 import org.springframework.stereotype.Service;
@@ -9,7 +11,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -21,6 +22,9 @@ import java.util.Set;
  * <p><b>Regra de conflito de horário (#12):</b> uma agenda ocupa todos os profissionais dela do
  * início ({@code dataHora}) até o fim (início + soma das durações dos serviços). Um profissional não
  * pode estar em duas agendas não canceladas cujos intervalos se sobreponham. Ver {@link #verificarConflito}.
+ *
+ * <p>Erros (#13): os métodos lançam {@link RecursoNaoEncontradoException} (404),
+ * {@link RegraNegocioException} (400) ou {@link ConflitoHorarioException} (409); nunca devolvem {@code null}.
  *
  * <p>Pendências deste service:
  * <ul>
@@ -55,10 +59,15 @@ public class AgendaService {
         return agendaRepository.findAll();
     }
 
-    /** @return a agenda, ou {@code null} se o id não existir */
+    /**
+     * Busca pelo id ou lança 404. {@code orElseThrow} abre o Optional: se tiver a agenda, devolve;
+     * se estiver vazio, lança a exceção criada pela função passada.
+     *
+     * @throws RecursoNaoEncontradoException se o id não existir (404)
+     */
     public Agenda buscarPorId(Long id) {
-        // orElse(null): abre o Optional; se estiver vazio, devolve null
-        return agendaRepository.findById(id).orElse(null);
+        return agendaRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agenda " + id + " não encontrada."));
     }
 
     /**
@@ -68,39 +77,41 @@ public class AgendaService {
      *
      * <p>TODO: o status inicial deveria ser sempre AGENDADO, definido aqui, e não vir do JSON.
      *
-     * @return a agenda criada, ou {@code null} se o cliente não foi informado ou não existe
+     * @throws RegraNegocioException se o cliente não foi informado ou não existe (400). É 400, e não
+     *         404, porque o problema está no corpo enviado, não no endereço chamado.
      */
     public Agenda criar(Agenda agenda) {
         if (agenda.getCliente() == null || agenda.getCliente().getId() == null) {
-            return null;
+            throw new RegraNegocioException("Informe o cliente do agendamento: {\"cliente\": {\"id\": ...}}.");
         }
 
-        Optional<Cliente> clienteOpt = clienteRepository.findById(agenda.getCliente().getId());
-        if (clienteOpt.isEmpty()) {
-            return null;
-        }
+        Long clienteId = agenda.getCliente().getId();
+        Cliente cliente = clienteRepository.findById(clienteId)
+                .orElseThrow(() -> new RegraNegocioException("Cliente " + clienteId + " não encontrado."));
 
-        agenda.setCliente(clienteOpt.get());
+        agenda.setCliente(cliente);
         return agendaRepository.save(agenda);
     }
 
-    /** Apaga a agenda e, por causa do cascade, todos os itens dela. */
+    /**
+     * Apaga a agenda e, por causa do cascade, todos os itens dela.
+     *
+     * @throws RecursoNaoEncontradoException se o id não existir (404)
+     * @throws org.springframework.dao.DataIntegrityViolationException se houver pagamentos registrados
+     *         para ela (o TratadorDeErros responde 409)
+     */
     public void deletar(Long id) {
+        buscarPorId(id); // garante o 404; o deleteById sozinho não avisa quando o id não existe
         agendaRepository.deleteById(id);
     }
 
     /**
      * Troca o status (AGENDADO, CONCLUIDO, CANCELADO). Hoje qualquer troca é aceita.
      *
-     * @return a agenda atualizada, ou {@code null} se o id não existir
+     * @throws RecursoNaoEncontradoException se o id não existir (404)
      */
     public Agenda atualizarStatus(Long id, StatusAgendamento novoStatus) {
-        Optional<Agenda> agendaOpt = agendaRepository.findById(id);
-        if (agendaOpt.isEmpty()) {
-            return null;
-        }
-
-        Agenda agenda = agendaOpt.get();
+        Agenda agenda = buscarPorId(id);
         agenda.setStatus(novoStatus);
         return agendaRepository.save(agenda);
     }
@@ -110,28 +121,22 @@ public class AgendaService {
      *
      * <p>Regras aplicadas:
      * <ol>
-     *   <li>agenda, serviço e profissional precisam existir;</li>
-     *   <li>o profissional precisa ter esse serviço na lista dele (tabela profissional_servico);</li>
+     *   <li>agenda, serviço e profissional precisam existir (senão 404);</li>
+     *   <li>o profissional precisa ter esse serviço na lista dele, na tabela profissional_servico (senão 400);</li>
      *   <li>com o serviço novo, a agenda não pode passar a sobrepor outro atendimento de nenhum dos
-     *       profissionais dela (#12);</li>
+     *       profissionais dela (senão 409, #12);</li>
      *   <li>o preço atual do serviço é copiado para {@code precoCobrado}.</li>
      * </ol>
      *
-     * @return a agenda com o novo item, ou {@code null} se a regra 1 ou 2 falhar
-     * @throws ConflitoHorarioException se a regra 3 falhar (vira HTTP 409 no TratadorDeErros)
+     * @return a agenda com o novo item
      */
     public Agenda adicionarItem(Long agendaId, Long servicoId, Long profissionalId) {
-        Optional<Agenda> agendaOpt = agendaRepository.findById(agendaId);
-        Optional<Servico> servicoOpt = servicoRepository.findById(servicoId);
-        Optional<Profissional> profissionalOpt = profissionalRepository.findById(profissionalId);
-
-        if (agendaOpt.isEmpty() || servicoOpt.isEmpty() || profissionalOpt.isEmpty()) {
-            return null;
-        }
-
-        Agenda agenda = agendaOpt.get();
-        Servico servico = servicoOpt.get();
-        Profissional profissional = profissionalOpt.get();
+        // Regra 1
+        Agenda agenda = buscarPorId(agendaId);
+        Servico servico = servicoRepository.findById(servicoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço " + servicoId + " não encontrado."));
+        Profissional profissional = profissionalRepository.findById(profissionalId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Profissional " + profissionalId + " não encontrado."));
 
         // Regra 2: procura o serviço na lista do profissional
         boolean profissionalFazOServico = false;
@@ -143,7 +148,8 @@ public class AgendaService {
         }
 
         if (!profissionalFazOServico) {
-            return null;
+            throw new RegraNegocioException(
+                    profissional.getNome() + " não faz o serviço " + servico.getNome() + ".");
         }
 
         // Regra 3: como fica o intervalo da agenda depois de incluir este serviço.
@@ -178,16 +184,16 @@ public class AgendaService {
      * removido da lista também é apagado do banco ao salvar. Não precisa checar conflito:
      * remover um serviço só encurta a agenda.
      *
-     * @return a agenda atualizada, ou {@code null} se a agenda não existir
+     * @throws RecursoNaoEncontradoException se a agenda não existir, ou se o item não for dela (404)
      */
     public Agenda removerItem(Long agendaId, Long itemId) {
-        Optional<Agenda> agendaOpt = agendaRepository.findById(agendaId);
-        if (agendaOpt.isEmpty()) {
-            return null;
-        }
+        Agenda agenda = buscarPorId(agendaId);
 
-        Agenda agenda = agendaOpt.get();
-        agenda.getItens().removeIf(item -> item.getId().equals(itemId));
+        // removeIf devolve true se tirou algum item; false quer dizer que o item não é desta agenda
+        boolean removeu = agenda.getItens().removeIf(item -> item.getId().equals(itemId));
+        if (!removeu) {
+            throw new RecursoNaoEncontradoException("Item " + itemId + " não encontrado na agenda " + agendaId + ".");
+        }
 
         return agendaRepository.save(agenda);
     }

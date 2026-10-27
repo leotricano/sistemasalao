@@ -1,19 +1,19 @@
 package br.com.leotricano.sistemasalao.service;
 
+import br.com.leotricano.sistemasalao.exception.RecursoNaoEncontradoException;
 import br.com.leotricano.sistemasalao.model.Cliente;
 import br.com.leotricano.sistemasalao.repository.ClienteRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Service = o tratamento dos dados. Fica entre o controller (HTTP) e o repository (banco), e é
  * onde moram as regras de negócio. Este cuida do cadastro de clientes (RF01).
  *
- * <p>Convenção atual de todos os services: quando algo não é encontrado, o método devolve
- * {@code null} e o controller transforma isso em 404.
- * TODO(#13): trocar os {@code return null} por exceções tratadas num {@code @RestControllerAdvice}.
+ * <p>Convenção de erros de todos os services (#13): quando algo dá errado, o método lança uma
+ * exceção do pacote {@code exception} (nunca devolve {@code null}). O {@code TratadorDeErros}
+ * transforma a exceção na resposta HTTP certa.
  */
 @Service // registra a classe no Spring, que cria uma instância e a injeta onde for pedida
 public class ClienteService {
@@ -37,7 +37,15 @@ public class ClienteService {
         return clienteRepository.save(cliente);
     }
 
+    /**
+     * Remove o cliente.
+     *
+     * @throws RecursoNaoEncontradoException se o id não existir (404)
+     * @throws org.springframework.dao.DataIntegrityViolationException se o cliente tiver agendamentos;
+     *         o banco recusa por causa da chave estrangeira e o TratadorDeErros responde 409
+     */
     public void deletar(Long id) {
+        buscar(id); // garante o 404; o deleteById sozinho não avisa quando o id não existe
         clienteRepository.deleteById(id);
     }
 
@@ -46,21 +54,23 @@ public class ClienteService {
      * Busca o registro do banco e copia os campos novos para ele, em vez de salvar o objeto que
      * veio na requisição, para não depender de o JSON trazer o id certo.
      *
-     * @return o cliente atualizado, ou {@code null} se o id não existir
+     * @throws RecursoNaoEncontradoException se o id não existir (404)
      */
     public Cliente atualizar(Long id, Cliente dadosNovos) {
-        // Optional = "caixa" que pode ter o cliente ou estar vazia, evitando NullPointerException
-        Optional<Cliente> clienteExistente = clienteRepository.findById(id);
-
-        if (clienteExistente.isEmpty()) {
-            return null;
-        }
-
-        Cliente cliente = clienteExistente.get();
+        Cliente cliente = buscar(id);
         cliente.setNome(dadosNovos.getNome());
         cliente.setEmail(dadosNovos.getEmail());
         cliente.setTelefone(dadosNovos.getTelefone());
 
         return clienteRepository.save(cliente);
+    }
+
+    /**
+     * Busca pelo id ou lança 404. {@code orElseThrow} abre o Optional: se tiver o cliente, devolve;
+     * se estiver vazio, lança a exceção criada pela função passada.
+     */
+    private Cliente buscar(Long id) {
+        return clienteRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente " + id + " não encontrado."));
     }
 }

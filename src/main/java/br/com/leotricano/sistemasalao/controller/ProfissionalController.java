@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * Endpoints de {@code /profissionais}: cadastro e vínculo com os serviços que cada um faz.
- * As respostas usam {@link ProfissionalResponse}.
+ * As respostas usam {@link ProfissionalResponse}; erros são tratados pelo {@code TratadorDeErros}.
  */
 @RestController
 @RequestMapping("/profissionais")
@@ -39,38 +39,26 @@ public class ProfissionalController {
 
     /** {@code PUT /profissionais/{id}} → atualiza nome e especialidade; 404 se não existir. */
     @PutMapping("/{id}")
-    public ResponseEntity<ProfissionalResponse> atualizar(@PathVariable Long id, @Valid @RequestBody Profissional dadosNovos) {
-        Profissional atualizado = profissionalService.atualizar(id, dadosNovos);
-        if (atualizado == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(ProfissionalResponse.from(atualizado));
+    public ProfissionalResponse atualizar(@PathVariable Long id, @Valid @RequestBody Profissional dadosNovos) {
+        return ProfissionalResponse.from(profissionalService.atualizar(id, dadosNovos));
     }
 
-    /** {@code DELETE /profissionais/{id}} → remove e responde 204. */
+    /** {@code DELETE /profissionais/{id}} → remove e responde 204; 404 se não existir, 409 se tiver atendimentos. */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         profissionalService.deletar(id);
         return ResponseEntity.noContent().build();
     }
 
-    /** {@code POST /profissionais/{id}/servicos/{servicoId}} → o profissional passa a fazer o serviço. Sem corpo. */
+    /** {@code POST /profissionais/{id}/servicos/{servicoId}} → o profissional passa a fazer o serviço. Sem corpo; 404 se algum não existir. */
     @PostMapping("/{profissionalId}/servicos/{servicoId}")
-    public ResponseEntity<ProfissionalResponse> vincularServico(@PathVariable Long profissionalId, @PathVariable Long servicoId) {
-        Profissional profissional = profissionalService.vincularServico(profissionalId, servicoId);
-        if (profissional == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(ProfissionalResponse.from(profissional));
+    public ProfissionalResponse vincularServico(@PathVariable Long profissionalId, @PathVariable Long servicoId) {
+        return ProfissionalResponse.from(profissionalService.vincularServico(profissionalId, servicoId));
     }
 
-    /** {@code DELETE /profissionais/{id}/servicos/{servicoId}} → o profissional deixa de fazer o serviço. */
+    /** {@code DELETE /profissionais/{id}/servicos/{servicoId}} → o profissional deixa de fazer o serviço; 404 se o profissional não existir. */
     @DeleteMapping("/{profissionalId}/servicos/{servicoId}")
-    public ResponseEntity<ProfissionalResponse> desvincularServico(@PathVariable Long profissionalId, @PathVariable Long servicoId) {
-        Profissional profissional = profissionalService.desvincularServico(profissionalId, servicoId);
-        if (profissional == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(ProfissionalResponse.from(profissional));
+    public ProfissionalResponse desvincularServico(@PathVariable Long profissionalId, @PathVariable Long servicoId) {
+        return ProfissionalResponse.from(profissionalService.desvincularServico(profissionalId, servicoId));
     }
 }

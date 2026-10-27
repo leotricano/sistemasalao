@@ -14,6 +14,7 @@ import java.util.List;
  *
  * <p>Padrão dos controllers com DTO: a entrada ainda é a entidade ({@code @RequestBody Servico}),
  * mas a saída é sempre convertida para {@link ServicoResponse} com {@code ServicoResponse.from(...)}.
+ * Erros são tratados pelo {@code TratadorDeErros} (ver ClienteController).
  */
 @RestController
 @RequestMapping("/servicos")
@@ -42,15 +43,11 @@ public class ServicoController {
 
     /** {@code PUT /servicos/{id}} → atualiza nome, duração e preço; 404 se não existir. */
     @PutMapping("/{id}")
-    public ResponseEntity<ServicoResponse> atualizar(@PathVariable Long id, @Valid @RequestBody Servico dadosNovos) {
-        Servico atualizado = servicoService.atualizar(id, dadosNovos);
-        if (atualizado == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(ServicoResponse.from(atualizado));
+    public ServicoResponse atualizar(@PathVariable Long id, @Valid @RequestBody Servico dadosNovos) {
+        return ServicoResponse.from(servicoService.atualizar(id, dadosNovos));
     }
 
-    /** {@code DELETE /servicos/{id}} → remove e responde 204. */
+    /** {@code DELETE /servicos/{id}} → remove e responde 204; 404 se não existir, 409 se estiver em uso. */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         servicoService.deletar(id);

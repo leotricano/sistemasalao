@@ -8,7 +8,7 @@ API REST em Spring Boot para agendamento, histórico de clientes e controle de p
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 27/10/2026:** Sprint 1 em andamento. Cadastros, agendamento com vários itens e pagamentos funcionam. Os JSONs de resposta usam DTOs, a duração dos serviços é guardada em minutos e a API recusa horários sobrepostos para o mesmo profissional. Falta o tratamento geral de erros e o relatório.
+**Situação em 27/10/2026:** Sprint 1 concluída. Cadastros, agendamento com vários itens e pagamentos funcionam. Os JSONs de resposta usam DTOs, a duração dos serviços é guardada em minutos a API recusa horários sobrepostos para o mesmo profissional e todo erro volta com status HTTP correto e mensagem em português. Próximos: cancelar/remarcar, filtros da agenda, histórico e relatório.
 
 ---
 
@@ -142,12 +142,35 @@ erDiagram
 | POST | `/agendas/{id}/pagamentos?valor=&formaPagamento=` | Registra pagamento |
 | DELETE | `/agendas/{id}/pagamentos/{pagamentoId}` | Remove pagamento |
 
+### Respostas de erro
+
+Todo erro da API volta no mesmo formato, para o frontend só precisar mostrar a `mensagem`:
+
+```json
+{"status": 404, "mensagem": "Agenda 99 não encontrada."}
+```
+
+| HTTP | Quando | Exemplo de mensagem |
+|---|---|---|
+| 400 | Regra do salão violada | `William não faz o serviço Manicure.` |
+| 400 | Campo inválido (`@Valid`) | `duracaoMinutos: deve ser maior que 0; nome: não deve estar em branco` |
+| 400 | JSON malformado, tipo errado ou enum inválido | `Corpo da requisição inválido: confira o formato do JSON e o tipo de cada campo.` |
+| 400 | Parâmetro de URL inválido ou ausente | `Valor inválido para o parâmetro 'formaPagamento': BOLETO.` |
+| 404 | Id que não existe | `Cliente 99 não encontrado.` |
+| 409 | Conflito de horário | `William já tem atendimento em 03/11/2026 das 14:00 às 17:00 (agenda 1, cliente Ana Paula).` |
+| 409 | Apagar algo em uso | `Não é possível concluir: o registro está ligado a outros dados...` |
+| 500 | Erro inesperado | `Erro inesperado no servidor.` (o detalhe fica só no log) |
+
+Quem faz isso é o `exception/TratadorDeErros`: os services lançam exceções e ele escolhe o status e a mensagem.
+
 ### Regras de negócio já implementadas
 - Um item só é aceito se o profissional **faz** aquele serviço (vínculo em `profissional_servico`).
 - O preço do serviço é **copiado** para `precoCobrado` no momento do agendamento, para que um reajuste futuro não altere atendimentos antigos.
 - Um agendamento pode ter vários itens, cada um com seu próprio profissional.
 - O total do agendamento é a soma de `precoCobrado` dos itens, e a duração total é a soma de `duracaoMinutos` dos serviços (ambos calculados no `AgendaResponse`).
 - **Conflito de horário (#12):** uma agenda ocupa todos os profissionais dela de `dataHora` até `dataHoraFim` (início + soma das durações). Incluir um serviço que faça algum desses profissionais ter outro atendimento sobreposto, não cancelado, é recusado com `409 Conflict` e uma mensagem como `"William já tem atendimento em 03/11/2026 das 14:00 às 17:00 (agenda 1, cliente Ana Paula)"`. Encostar (um termina às 14:00, outro começa às 14:00) é permitido.
+- Um pagamento precisa ter valor maior que zero, e só pode ser apagado pela agenda a que pertence.
+- Não é possível apagar cliente, serviço, profissional ou agenda que estejam sendo usados por outros registros (409).
 - A duração do serviço é obrigatória e precisa ser um número inteiro positivo de minutos; texto, zero ou negativo voltam `400 Bad Request`.
 
 ---
@@ -168,13 +191,14 @@ erDiagram
 | #10 | DTOs de resposta: fim do loop infinito no JSON | — |
 | #11 | Duração do serviço em minutos (`duracaoMinutos`) e duração total do agendamento | RF02 |
 | #12 | Bloqueio de conflito de horário por profissional, com resposta 409 | RF03 |
+| #13 | Tratamento de erros: exceções nos services, `TratadorDeErros` e formato único de erro | — |
 
 ## O que vamos fazer
 
-### Sprint 1 (27/10 a 02/11)
+### Sprint 1 (27/10 a 02/11) ✅
 - [x] **#11** Duração do serviço em minutos (RF02)
 - [x] **#12** Bloquear conflito de horário do profissional (RF03)
-- [ ] **#13** Tratamento de erros com `@RestControllerAdvice`
+- [x] **#13** Tratamento de erros com `@RestControllerAdvice`
 
 ### Sprint 2 (03/11 a 09/11)
 - [ ] **#14** Cancelar e remarcar agendamento (RF08)
@@ -207,14 +231,14 @@ Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp 
 | **`precoCobrado` no item** | Guarda o preço do dia do atendimento, independente de reajustes. |
 | **Security com `permitAll()`** | Temporário, para testar no Postman. A autenticação real é o card #18 (RNF01). |
 | **Conflito: a agenda inteira é um bloco** | Hoje a agenda tem um único horário de início. Os serviços acontecem em sequência, então todos os profissionais dela ficam ocupados do início ao fim. É conservador (uma manicure que só faz a última parte também fica bloqueada desde o início) e será refinado no #28. |
-| **Exceção + `@RestControllerAdvice`** | O service lança `ConflitoHorarioException`; o `TratadorDeErros` transforma em 409 com mensagem. O controller não precisa de `if` para esse caso. É o modelo que o #13 vai estender aos outros erros. |
+| **Exceções + `@RestControllerAdvice`** | Os services lançam `RecursoNaoEncontradoException` (404), `RegraNegocioException` (400) ou `ConflitoHorarioException` (409) em vez de devolver `null`. O `TratadorDeErros` transforma cada uma na resposta certa, e os controllers ficam sem `if` nem try/catch. |
+| **Erro 500 sem detalhes** | O stack trace vai só para o log da aplicação; mandá-lo para quem chamou a API exporia o funcionamento interno. |
 | **Monolito em camadas** | Projeto de pequeno porte e desenvolvedor único; microsserviços trariam complexidade sem benefício (Tarefa 2). |
 
 ## Problemas conhecidos
 
 | Problema | Onde resolver |
 |---|---|
-| Services retornam `null` em vez de lançar exceção; os erros viram respostas genéricas | #13 |
 | Mudar o status de CANCELADO para AGENDADO não verifica conflito de horário | #14 |
 | Numa agenda com vários profissionais, todos ficam bloqueados pelo tempo total, mesmo quem só atende uma parte | #28 |
 | A API aceita pagamentos acima do total do agendamento | sem card ainda |

@@ -12,7 +12,8 @@ import java.util.List;
 
 /**
  * Endpoints de {@code /agendas} (RF03): agendamentos e os serviços dentro de cada um.
- * Todas as respostas usam {@link AgendaResponse}, que já traz itens, duração total e valor total.
+ * Todas as respostas usam {@link AgendaResponse}, que já traz itens, término, duração total e
+ * valor total. Os erros (404, 400, 409) vêm do service e são montados pelo {@code TratadorDeErros}.
  */
 @RestController
 @RequestMapping("/agendas")
@@ -37,12 +38,8 @@ public class AgendaController {
 
     /** {@code GET /agendas/{id}} → detalhe de um agendamento; 404 se não existir. */
     @GetMapping("/{id}")
-    public ResponseEntity<AgendaResponse> buscarPorId(@PathVariable Long id) {
-        Agenda agenda = agendaService.buscarPorId(id);
-        if (agenda == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(AgendaResponse.from(agenda));
+    public AgendaResponse buscarPorId(@PathVariable Long id) {
+        return AgendaResponse.from(agendaService.buscarPorId(id));
     }
 
     /**
@@ -51,25 +48,20 @@ public class AgendaController {
      * Responde 400 se o cliente não for informado ou não existir.
      */
     @PostMapping
-    public ResponseEntity<AgendaResponse> criar(@Valid @RequestBody Agenda agenda) {
-        Agenda criada = agendaService.criar(agenda);
-        if (criada == null) {
-            return ResponseEntity.badRequest().build();
-        }
-        return ResponseEntity.ok(AgendaResponse.from(criada));
+    public AgendaResponse criar(@Valid @RequestBody Agenda agenda) {
+        return AgendaResponse.from(agendaService.criar(agenda));
     }
 
-    /** {@code PUT /agendas/{id}/status} → troca o status. O corpo é só o texto, com aspas: {@code "CONCLUIDO"}. */
+    /**
+     * {@code PUT /agendas/{id}/status} → troca o status. O corpo é só o texto, com aspas: {@code "CONCLUIDO"}.
+     * 404 se a agenda não existir; 400 se o status não for um dos três válidos.
+     */
     @PutMapping("/{id}/status")
-    public ResponseEntity<AgendaResponse> atualizarStatus(@PathVariable Long id, @RequestBody StatusAgendamento novoStatus) {
-        Agenda atualizada = agendaService.atualizarStatus(id, novoStatus);
-        if (atualizada == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(AgendaResponse.from(atualizada));
+    public AgendaResponse atualizarStatus(@PathVariable Long id, @RequestBody StatusAgendamento novoStatus) {
+        return AgendaResponse.from(agendaService.atualizarStatus(id, novoStatus));
     }
 
-    /** {@code DELETE /agendas/{id}} → apaga a agenda e os itens dela; responde 204. */
+    /** {@code DELETE /agendas/{id}} → apaga a agenda e os itens dela; responde 204, 404 se não existir, 409 se tiver pagamentos. */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         agendaService.deletar(id);
@@ -80,31 +72,21 @@ public class AgendaController {
      * {@code POST /agendas/{id}/itens?servicoId=1&profissionalId=2} → inclui um serviço na agenda.
      * {@code @RequestParam} lê os valores depois do "?" na URL.
      * <ul>
-     *   <li>404 se algo não existir ou se o profissional não fizer o serviço;</li>
-     *   <li>409 se o profissional já tiver outro atendimento no horário (#12). Esse caso não passa
-     *       pelo {@code if} abaixo: o service lança ConflitoHorarioException e o TratadorDeErros
-     *       monta a resposta.</li>
+     *   <li>404 se a agenda, o serviço ou o profissional não existir;</li>
+     *   <li>400 se o profissional não fizer o serviço;</li>
+     *   <li>409 se o profissional já tiver outro atendimento no horário (#12).</li>
      * </ul>
      */
     @PostMapping("/{agendaId}/itens")
-    public ResponseEntity<AgendaResponse> adicionarItem(@PathVariable Long agendaId,
-                                                         @RequestParam Long servicoId,
-                                                         @RequestParam Long profissionalId) {
-        Agenda agenda = agendaService.adicionarItem(agendaId, servicoId, profissionalId);
-        if (agenda == null) {
-            // TODO(#13): diferenciar "não encontrado" (404) de "profissional não faz o serviço" (400)
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(AgendaResponse.from(agenda));
+    public AgendaResponse adicionarItem(@PathVariable Long agendaId,
+                                        @RequestParam Long servicoId,
+                                        @RequestParam Long profissionalId) {
+        return AgendaResponse.from(agendaService.adicionarItem(agendaId, servicoId, profissionalId));
     }
 
-    /** {@code DELETE /agendas/{id}/itens/{itemId}} → tira um serviço da agenda. */
+    /** {@code DELETE /agendas/{id}/itens/{itemId}} → tira um serviço da agenda; 404 se a agenda não existir ou o item não for dela. */
     @DeleteMapping("/{agendaId}/itens/{itemId}")
-    public ResponseEntity<AgendaResponse> removerItem(@PathVariable Long agendaId, @PathVariable Long itemId) {
-        Agenda agenda = agendaService.removerItem(agendaId, itemId);
-        if (agenda == null) {
-            return ResponseEntity.notFound().build();
-        }
-        return ResponseEntity.ok(AgendaResponse.from(agenda));
+    public AgendaResponse removerItem(@PathVariable Long agendaId, @PathVariable Long itemId) {
+        return AgendaResponse.from(agendaService.removerItem(agendaId, itemId));
     }
 }
