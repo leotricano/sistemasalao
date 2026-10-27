@@ -14,4 +14,11 @@ public interface PagamentoRepository extends JpaRepository<Pagamento, Long> {
      * <i>derived query</i>.
      */
     List<Pagamento> findByAgendaId(Long agendaId);
+
+    /**
+     * Diz se a agenda tem algum pagamento. Também é uma derived query: o prefixo {@code exists}
+     * faz o Spring gerar um SQL que só verifica se existe, sem carregar os pagamentos.
+     * Usada para impedir o cancelamento de agenda já paga (#14).
+     */
+    boolean existsByAgendaId(Long agendaId);
 }

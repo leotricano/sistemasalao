@@ -8,7 +8,7 @@ API REST em Spring Boot para agendamento, histórico de clientes e controle de p
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 27/10/2026:** Sprint 1 concluída. Cadastros, agendamento com vários itens e pagamentos funcionam. Os JSONs de resposta usam DTOs, a duração dos serviços é guardada em minutos a API recusa horários sobrepostos para o mesmo profissional e todo erro volta com status HTTP correto e mensagem em português. Próximos: cancelar/remarcar, filtros da agenda, histórico e relatório.
+**Situação em 27/10/2026:** Sprint 1 concluída. Cadastros, agendamento com vários itens e pagamentos funcionam. Os JSONs de resposta usam DTOs, a duração dos serviços é guardada em minutos a API recusa horários sobrepostos para o mesmo profissional e todo erro volta com status HTTP correto e mensagem em português. Agendamentos podem ser cancelados, reativados e remarcados com regras de status (Sprint 2 em andamento). Próximos: filtros da agenda, histórico e relatório.
 
 ---
 
@@ -133,8 +133,9 @@ erDiagram
 | DELETE | `/profissionais/{id}/servicos/{servicoId}` | Desvincula um serviço |
 | GET | `/agendas` | Lista agendamentos |
 | GET | `/agendas/{id}` | Detalhe do agendamento, com itens, término, duração e total |
-| POST | `/agendas` | Cria agendamento (`{"cliente":{"id":1},"dataHora":"…","status":"AGENDADO"}`) |
-| PUT | `/agendas/{id}/status` | Muda o status (corpo: `"CONCLUIDO"`) |
+| POST | `/agendas` | Cria agendamento, sempre como AGENDADO (`{"cliente":{"id":1},"dataHora":"2026-11-03T14:00:00"}`) |
+| PUT | `/agendas/{id}/status` | Conclui, cancela ou reativa (corpo: `"CONCLUIDO"`, `"CANCELADO"` ou `"AGENDADO"`) |
+| PUT | `/agendas/{id}/remarcar` | Remarca para outra data e hora (`{"dataHora":"2026-11-05T10:00:00"}`) |
 | DELETE | `/agendas/{id}` | Remove agendamento |
 | POST | `/agendas/{id}/itens?servicoId=&profissionalId=` | Adiciona um serviço ao agendamento (409 se houver conflito de horário) |
 | DELETE | `/agendas/{id}/itens/{itemId}` | Remove um serviço do agendamento |
@@ -162,6 +163,28 @@ Todo erro da API volta no mesmo formato, para o frontend só precisar mostrar a 
 | 500 | Erro inesperado | `Erro inesperado no servidor.` (o detalhe fica só no log) |
 
 Quem faz isso é o `exception/TratadorDeErros`: os services lançam exceções e ele escolhe o status e a mensagem.
+
+### Ciclo de vida do agendamento (#14)
+
+Toda agenda nasce **AGENDADO**, mesmo que o JSON mande outro status.
+
+```
+              concluir (precisa ter serviço)
+  AGENDADO  ─────────────────────────────►  CONCLUIDO   (final: não muda mais)
+     │  ▲
+     │  │ reativar (só se o horário continuar livre → senão 409)
+     ▼  │
+  CANCELADO   (não pode ser concluído direto)
+```
+
+| Ação | Regra | Erro |
+|---|---|---|
+| Cancelar | não pode ter pagamento registrado | 400 |
+| Concluir | precisa ter pelo menos um serviço; pagamento pode vir depois | 400 |
+| Reativar (CANCELADO → AGENDADO) | o horário precisa estar livre para os profissionais | 409 |
+| Mudar um atendimento CONCLUIDO | nunca | 400 |
+| Remarcar | só AGENDADO, data no futuro, horário livre | 400 / 409 |
+| Incluir ou remover serviço | só em agenda AGENDADA | 400 |
 
 ### Regras de negócio já implementadas
 - Um item só é aceito se o profissional **faz** aquele serviço (vínculo em `profissional_servico`).
@@ -192,6 +215,7 @@ Quem faz isso é o `exception/TratadorDeErros`: os services lançam exceções e
 | #11 | Duração do serviço em minutos (`duracaoMinutos`) e duração total do agendamento | RF02 |
 | #12 | Bloqueio de conflito de horário por profissional, com resposta 409 | RF03 |
 | #13 | Tratamento de erros: exceções nos services, `TratadorDeErros` e formato único de erro | — |
+| #14 | Cancelar, reativar e remarcar, com regras de mudança de status | RF08 |
 
 ## O que vamos fazer
 
@@ -201,7 +225,7 @@ Quem faz isso é o `exception/TratadorDeErros`: os services lançam exceções e
 - [x] **#13** Tratamento de erros com `@RestControllerAdvice`
 
 ### Sprint 2 (03/11 a 09/11)
-- [ ] **#14** Cancelar e remarcar agendamento (RF08)
+- [x] **#14** Cancelar e remarcar agendamento (RF08)
 - [ ] **#15** Consultar agenda por dia, semana e profissional (RF04)
 - [ ] **#16** Histórico de atendimentos do cliente (RF06)
 - [ ] **#28** Vários serviços por agendamento, começando pelo profissional (RF03 alterado)
@@ -232,6 +256,9 @@ Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp 
 | **Security com `permitAll()`** | Temporário, para testar no Postman. A autenticação real é o card #18 (RNF01). |
 | **Conflito: a agenda inteira é um bloco** | Hoje a agenda tem um único horário de início. Os serviços acontecem em sequência, então todos os profissionais dela ficam ocupados do início ao fim. É conservador (uma manicure que só faz a última parte também fica bloqueada desde o início) e será refinado no #28. |
 | **Exceções + `@RestControllerAdvice`** | Os services lançam `RecursoNaoEncontradoException` (404), `RegraNegocioException` (400) ou `ConflitoHorarioException` (409) em vez de devolver `null`. O `TratadorDeErros` transforma cada uma na resposta certa, e os controllers ficam sem `if` nem try/catch. |
+| **Concluir sem pagamento é permitido** | O cliente pode pagar depois. Se o salão quiser exigir pagamento antes de concluir, é uma verificação a mais em `AgendaService.atualizarStatus`. |
+| **Cancelar com pagamento é bloqueado** | Evita agenda cancelada contando no faturamento. Para cancelar, o pagamento precisa ser removido antes (estorno ainda não existe). |
+| **Cancelar em vez de apagar** | `DELETE /agendas/{id}` é para corrigir lançamento errado. Para desmarcar, o certo é cancelar, que mantém o histórico do cliente. |
 | **Erro 500 sem detalhes** | O stack trace vai só para o log da aplicação; mandá-lo para quem chamou a API exporia o funcionamento interno. |
 | **Monolito em camadas** | Projeto de pequeno porte e desenvolvedor único; microsserviços trariam complexidade sem benefício (Tarefa 2). |
 
@@ -239,9 +266,8 @@ Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp 
 
 | Problema | Onde resolver |
 |---|---|
-| Mudar o status de CANCELADO para AGENDADO não verifica conflito de horário | #14 |
 | Numa agenda com vários profissionais, todos ficam bloqueados pelo tempo total, mesmo quem só atende uma parte | #28 |
 | A API aceita pagamentos acima do total do agendamento | sem card ainda |
-| As entradas (`@RequestBody`) ainda recebem entidades, então o cliente pode mandar `id` ou `status` na criação | DTOs de entrada, sem card ainda |
+| A maioria das entradas (`@RequestBody`) ainda recebe entidades; só o remarcar já usa DTO de entrada (`RemarcarRequest`) | DTOs de entrada, sem card ainda |
 | Mudanças de esquema do banco são feitas com SQL manual | Flyway, sem card ainda |
 | Não há testes automatizados | #26 |

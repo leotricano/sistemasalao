@@ -31,10 +31,14 @@ public class Agenda {
     @NotNull
     private LocalDateTime dataHora;
 
-    /** Grava o nome do enum ("AGENDADO") em vez da posição (0, 1, 2), que quebraria se a ordem mudasse. */
+    /**
+     * Grava o nome do enum ("AGENDADO") em vez da posição (0, 1, 2), que quebraria se a ordem mudasse.
+     * Começa como AGENDADO: o JSON de criação não precisa mandar o status, e o AgendaService ignora
+     * qualquer outro valor enviado. Depois, só muda pelas transições permitidas (ver StatusAgendamento).
+     */
     @NotNull
     @Enumerated(EnumType.STRING)
-    private StatusAgendamento status;
+    private StatusAgendamento status = StatusAgendamento.AGENDADO;
 
     /**
      * Serviços deste agendamento.

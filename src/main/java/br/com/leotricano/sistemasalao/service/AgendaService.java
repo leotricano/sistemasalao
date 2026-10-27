@@ -14,25 +14,26 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Regras de agendamento (RF03): criar a agenda, mudar o status e incluir ou remover serviços.
+ * Regras de agendamento: criar (RF03), incluir/remover serviços, mudar status, cancelar e
+ * remarcar (RF08).
  *
  * <p>Fluxo de uso hoje: primeiro {@link #criar} a agenda (cliente + data/hora), depois chamar
  * {@link #adicionarItem} uma vez para cada serviço.
  *
  * <p><b>Regra de conflito de horário (#12):</b> uma agenda ocupa todos os profissionais dela do
  * início ({@code dataHora}) até o fim (início + soma das durações dos serviços). Um profissional não
- * pode estar em duas agendas não canceladas cujos intervalos se sobreponham. Ver {@link #verificarConflito}.
+ * pode estar em duas agendas não canceladas cujos intervalos se sobreponham. É checada ao incluir
+ * serviço, ao remarcar e ao reativar uma agenda cancelada. Ver {@link #verificarConflito}.
+ *
+ * <p><b>Ciclo de vida (#14):</b> toda agenda nasce AGENDADO. Só uma agenda AGENDADA pode ter
+ * serviços alterados ou ser remarcada. As mudanças de status permitidas estão em
+ * {@link #atualizarStatus} e no Javadoc de {@link StatusAgendamento}.
  *
  * <p>Erros (#13): os métodos lançam {@link RecursoNaoEncontradoException} (404),
  * {@link RegraNegocioException} (400) ou {@link ConflitoHorarioException} (409); nunca devolvem {@code null}.
  *
- * <p>Pendências deste service:
- * <ul>
- *   <li>TODO(#14): regras de cancelar e remarcar (RF08). Remarcar e voltar de CANCELADO para
- *       AGENDADO também precisam chamar {@link #verificarConflito}.</li>
- *   <li>TODO(#28): criar o agendamento começando pelo profissional, com vários serviços de uma vez,
- *       e tratar serviços de profissionais diferentes em horários diferentes na mesma visita.</li>
- * </ul>
+ * <p>TODO(#28): criar o agendamento começando pelo profissional, com vários serviços de uma vez,
+ * e tratar serviços de profissionais diferentes em horários diferentes na mesma visita.
  */
 @Service
 public class AgendaService {
@@ -44,15 +45,18 @@ public class AgendaService {
     private final ClienteRepository clienteRepository;
     private final ServicoRepository servicoRepository;
     private final ProfissionalRepository profissionalRepository;
+    private final PagamentoRepository pagamentoRepository;
 
     public AgendaService(AgendaRepository agendaRepository,
                           ClienteRepository clienteRepository,
                           ServicoRepository servicoRepository,
-                          ProfissionalRepository profissionalRepository) {
+                          ProfissionalRepository profissionalRepository,
+                          PagamentoRepository pagamentoRepository) {
         this.agendaRepository = agendaRepository;
         this.clienteRepository = clienteRepository;
         this.servicoRepository = servicoRepository;
         this.profissionalRepository = profissionalRepository;
+        this.pagamentoRepository = pagamentoRepository;
     }
 
     public List<Agenda> listarTodas() {
@@ -71,11 +75,10 @@ public class AgendaService {
     }
 
     /**
-     * Cria uma agenda sem serviços. O JSON só traz o id do cliente ({@code {"cliente":{"id":1}}}),
-     * então o cliente completo é buscado no banco e colocado na agenda antes de salvar.
-     * Não há checagem de conflito aqui: sem itens, a agenda ainda não ocupa nenhum profissional.
-     *
-     * <p>TODO: o status inicial deveria ser sempre AGENDADO, definido aqui, e não vir do JSON.
+     * Cria uma agenda sem serviços, sempre com status AGENDADO. O JSON só traz o id do cliente
+     * ({@code {"cliente":{"id":1}}}), então o cliente completo é buscado no banco e colocado na
+     * agenda antes de salvar. Não há checagem de conflito aqui: sem itens, a agenda ainda não
+     * ocupa nenhum profissional.
      *
      * @throws RegraNegocioException se o cliente não foi informado ou não existe (400). É 400, e não
      *         404, porque o problema está no corpo enviado, não no endereço chamado.
@@ -90,11 +93,14 @@ public class AgendaService {
                 .orElseThrow(() -> new RegraNegocioException("Cliente " + clienteId + " não encontrado."));
 
         agenda.setCliente(cliente);
+        // Ignora o status que veio no JSON: criar já como CONCLUIDO ou CANCELADO pularia as regras do #14
+        agenda.setStatus(StatusAgendamento.AGENDADO);
         return agendaRepository.save(agenda);
     }
 
     /**
-     * Apaga a agenda e, por causa do cascade, todos os itens dela.
+     * Apaga a agenda e, por causa do cascade, todos os itens dela. Serve para corrigir um lançamento
+     * errado; para desmarcar um atendimento, o certo é cancelar (o histórico fica guardado).
      *
      * @throws RecursoNaoEncontradoException se o id não existir (404)
      * @throws org.springframework.dao.DataIntegrityViolationException se houver pagamentos registrados
@@ -106,13 +112,83 @@ public class AgendaService {
     }
 
     /**
-     * Troca o status (AGENDADO, CONCLUIDO, CANCELADO). Hoje qualquer troca é aceita.
+     * Muda o status seguindo o ciclo de vida do agendamento (#14):
+     * <pre>
+     *   AGENDADO  → CONCLUIDO   precisa ter pelo menos um serviço (pagamento pode vir depois)
+     *   AGENDADO  → CANCELADO   não pode ter pagamento registrado
+     *   CANCELADO → AGENDADO    reativar: o horário precisa continuar livre (#12)
+     *   CONCLUIDO → qualquer    recusado: atendimento feito não se desfaz
+     *   CANCELADO → CONCLUIDO   recusado: precisa reativar antes
+     * </pre>
+     * Pedir o mesmo status que a agenda já tem não muda nada e não dá erro.
      *
      * @throws RecursoNaoEncontradoException se o id não existir (404)
+     * @throws RegraNegocioException se a mudança não for permitida (400)
+     * @throws ConflitoHorarioException se, ao reativar, o horário já estiver ocupado (409)
      */
     public Agenda atualizarStatus(Long id, StatusAgendamento novoStatus) {
         Agenda agenda = buscarPorId(id);
+        StatusAgendamento atual = agenda.getStatus();
+
+        if (novoStatus == atual) {
+            return agenda;
+        }
+
+        // enum pode ser comparado com == (cada valor existe uma única vez na memória)
+        if (atual == StatusAgendamento.CONCLUIDO) {
+            throw new RegraNegocioException("Atendimento concluído não pode mudar de status.");
+        }
+
+        if (atual == StatusAgendamento.CANCELADO && novoStatus == StatusAgendamento.CONCLUIDO) {
+            throw new RegraNegocioException(
+                    "Agendamento cancelado não pode ser concluído. Reative-o (status AGENDADO) antes.");
+        }
+
+        if (novoStatus == StatusAgendamento.CONCLUIDO && agenda.getItens().isEmpty()) {
+            throw new RegraNegocioException("Não é possível concluir um agendamento sem serviços.");
+        }
+
+        if (novoStatus == StatusAgendamento.CANCELADO && pagamentoRepository.existsByAgendaId(id)) {
+            throw new RegraNegocioException(
+                    "Este agendamento tem pagamentos registrados e não pode ser cancelado. Remova os pagamentos antes.");
+        }
+
+        // Reativar: enquanto estava cancelada, outra cliente pode ter ocupado o horário
+        if (atual == StatusAgendamento.CANCELADO && novoStatus == StatusAgendamento.AGENDADO) {
+            verificarConflito(agenda.getId(), profissionaisDa(agenda), agenda.getDataHora(), agenda.calcularFim());
+        }
+
         agenda.setStatus(novoStatus);
+        return agendaRepository.save(agenda);
+    }
+
+    /**
+     * Remarca o atendimento para outra data e hora, mantendo cliente, serviços e profissionais (RF08).
+     *
+     * <p>Regras:
+     * <ol>
+     *   <li>só agendas AGENDADAS podem ser remarcadas;</li>
+     *   <li>a nova data e hora precisa estar no futuro;</li>
+     *   <li>o novo horário precisa estar livre para todos os profissionais da agenda (#12).</li>
+     * </ol>
+     *
+     * @throws RecursoNaoEncontradoException se o id não existir (404)
+     * @throws RegraNegocioException se a regra 1 ou 2 falhar (400)
+     * @throws ConflitoHorarioException se a regra 3 falhar (409)
+     */
+    public Agenda remarcar(Long id, LocalDateTime novaDataHora) {
+        Agenda agenda = buscarPorId(id);
+
+        exigirAgendado(agenda, "remarcar");
+
+        if (!novaDataHora.isAfter(LocalDateTime.now())) {
+            throw new RegraNegocioException("A nova data e hora precisa ser no futuro.");
+        }
+
+        LocalDateTime novoFim = novaDataHora.plusMinutes(agenda.calcularDuracaoTotalMinutos());
+        verificarConflito(agenda.getId(), profissionaisDa(agenda), novaDataHora, novoFim);
+
+        agenda.setDataHora(novaDataHora);
         return agendaRepository.save(agenda);
     }
 
@@ -122,6 +198,7 @@ public class AgendaService {
      * <p>Regras aplicadas:
      * <ol>
      *   <li>agenda, serviço e profissional precisam existir (senão 404);</li>
+     *   <li>a agenda precisa estar AGENDADA (senão 400, #14);</li>
      *   <li>o profissional precisa ter esse serviço na lista dele, na tabela profissional_servico (senão 400);</li>
      *   <li>com o serviço novo, a agenda não pode passar a sobrepor outro atendimento de nenhum dos
      *       profissionais dela (senão 409, #12);</li>
@@ -138,7 +215,10 @@ public class AgendaService {
         Profissional profissional = profissionalRepository.findById(profissionalId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Profissional " + profissionalId + " não encontrado."));
 
-        // Regra 2: procura o serviço na lista do profissional
+        // Regra 2
+        exigirAgendado(agenda, "alterar os serviços de");
+
+        // Regra 3: procura o serviço na lista do profissional
         boolean profissionalFazOServico = false;
 
         for (Servico s : profissional.getServicos() ) {
@@ -152,17 +232,14 @@ public class AgendaService {
                     profissional.getNome() + " não faz o serviço " + servico.getNome() + ".");
         }
 
-        // Regra 3: como fica o intervalo da agenda depois de incluir este serviço.
+        // Regra 4: como fica o intervalo da agenda depois de incluir este serviço.
         // Ex.: agenda das 13:00 com corte (60) termina 14:00; incluindo coloração (120), passa a terminar 16:00.
         LocalDateTime inicio = agenda.getDataHora();
         LocalDateTime fim = inicio.plusMinutes(agenda.calcularDuracaoTotalMinutos() + servico.getDuracaoMinutos());
 
         // Todos os profissionais da agenda são afetados, não só o do serviço novo: aumentar a duração
         // também estende o horário de quem já estava nela.
-        Set<Long> profissionalIds = new HashSet<>();
-        for (ItemAgendamento item : agenda.getItens()) {
-            profissionalIds.add(item.getProfissional().getId());
-        }
+        Set<Long> profissionalIds = profissionaisDa(agenda);
         profissionalIds.add(profissional.getId());
 
         verificarConflito(agenda.getId(), profissionalIds, inicio, fim);
@@ -171,7 +248,7 @@ public class AgendaService {
         item.setAgenda(agenda);
         item.setServico(servico);
         item.setProfissional(profissional);
-        item.setPrecoCobrado(servico.getPreco()); // Regra 4: congela o preço do dia
+        item.setPrecoCobrado(servico.getPreco()); // Regra 5: congela o preço do dia
 
         agenda.getItens().add(item);
 
@@ -185,9 +262,11 @@ public class AgendaService {
      * remover um serviço só encurta a agenda.
      *
      * @throws RecursoNaoEncontradoException se a agenda não existir, ou se o item não for dela (404)
+     * @throws RegraNegocioException se a agenda não estiver AGENDADA (400)
      */
     public Agenda removerItem(Long agendaId, Long itemId) {
         Agenda agenda = buscarPorId(agendaId);
+        exigirAgendado(agenda, "alterar os serviços de");
 
         // removeIf devolve true se tirou algum item; false quer dizer que o item não é desta agenda
         boolean removeu = agenda.getItens().removeIf(item -> item.getId().equals(itemId));
@@ -196,6 +275,29 @@ public class AgendaService {
         }
 
         return agendaRepository.save(agenda);
+    }
+
+    /**
+     * Garante que a agenda está AGENDADA antes de uma alteração. Agenda concluída é histórico e
+     * agenda cancelada precisa ser reativada antes de mudar.
+     *
+     * @param acao o que se tentou fazer, para a mensagem (ex.: "remarcar")
+     * @throws RegraNegocioException se o status for outro (400)
+     */
+    private void exigirAgendado(Agenda agenda, String acao) {
+        if (agenda.getStatus() != StatusAgendamento.AGENDADO) {
+            throw new RegraNegocioException("Só é possível " + acao + " um agendamento com status AGENDADO"
+                    + " (status atual: " + agenda.getStatus() + ").");
+        }
+    }
+
+    /** Ids dos profissionais que atendem nesta agenda (sem repetição, por ser um Set). */
+    private Set<Long> profissionaisDa(Agenda agenda) {
+        Set<Long> ids = new HashSet<>();
+        for (ItemAgendamento item : agenda.getItens()) {
+            ids.add(item.getProfissional().getId());
+        }
+        return ids;
     }
 
     /**
@@ -217,13 +319,18 @@ public class AgendaService {
      * conferir a sobreposição. A janela de um dia antes do início limita a busca e supõe que nenhum
      * atendimento dura mais de 24 horas.
      *
-     * <p>Fica separado em um método próprio para ser reaproveitado ao remarcar (#14).
+     * <p>Usado ao incluir serviço, ao remarcar e ao reativar uma agenda cancelada.
      *
      * @param agendaIdIgnorado a agenda que está sendo alterada, que não conflita com ela mesma
      * @throws ConflitoHorarioException no primeiro conflito encontrado, com o nome do profissional e o horário
      */
     private void verificarConflito(Long agendaIdIgnorado, Set<Long> profissionalIds,
                                    LocalDateTime inicio, LocalDateTime fim) {
+        // Agenda sem serviços não ocupa ninguém (e "in ()" vazio não é aceito em SQL)
+        if (profissionalIds.isEmpty()) {
+            return;
+        }
+
         List<Agenda> candidatas = agendaRepository.buscarPossiveisConflitos(
                 profissionalIds, StatusAgendamento.CANCELADO, agendaIdIgnorado, fim, inicio.minusDays(1));
 
