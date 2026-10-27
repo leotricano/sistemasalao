@@ -7,6 +7,9 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Regras do cadastro de serviços do salão (RF02). Mesmo padrão do ClienteService.
+ */
 @Service
 public class ServicoService {
 
@@ -28,6 +31,13 @@ public class ServicoService {
         servicoRepository.deleteById(id);
     }
 
+    /**
+     * Atualiza nome, duração e preço.
+     * Mudar o preço aqui não altera agendamentos já feitos: eles guardam o próprio
+     * {@code precoCobrado} (ver ItemAgendamento).
+     *
+     * @return o serviço atualizado, ou {@code null} se o id não existir
+     */
     public Servico atualizar(Long id, Servico dadosNovos) {
         Optional<Servico> servicoExistente = servicoRepository.findById(id);
 
@@ -37,7 +47,7 @@ public class ServicoService {
 
         Servico servico = servicoExistente.get();
         servico.setNome(dadosNovos.getNome());
-        servico.setDuracao(dadosNovos.getDuracao());
+        servico.setDuracaoMinutos(dadosNovos.getDuracaoMinutos());
         servico.setPreco(dadosNovos.getPreco());
 
         return servicoRepository.save(servico);

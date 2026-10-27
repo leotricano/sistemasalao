@@ -8,6 +8,13 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Um agendamento: um cliente, num dia e horário, com um ou mais serviços (RF03). Tabela {@code agenda}.
+ *
+ * <p>Os serviços ficam em {@link ItemAgendamento}, e cada item tem o seu profissional. Assim, uma
+ * mesma visita pode ter corte com um cabeleireiro e pedicure com uma manicure.
+ * Os pagamentos ficam em {@link Pagamento}, que aponta para esta agenda.
+ */
 @Entity
 public class Agenda {
 
@@ -15,21 +22,41 @@ public class Agenda {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Muitas agendas para um cliente. No banco vira a coluna {@code cliente_id} (chave estrangeira). */
     @ManyToOne
     @NotNull
     private Cliente cliente;
 
+    /**
+     * Início do atendimento. O término é calculado somando a duração dos serviços dos itens.
+     * TODO(#12): usar esse intervalo para bloquear conflito de horário do profissional.
+     */
     @NotNull
     private LocalDateTime dataHora;
 
+    /** Grava o nome do enum ("AGENDADO") em vez da posição (0, 1, 2), que quebraria se a ordem mudasse. */
     @NotNull
     @Enumerated(EnumType.STRING)
     private StatusAgendamento status;
 
+    /**
+     * Serviços deste agendamento.
+     * <ul>
+     *   <li>{@code mappedBy = "agenda"}: quem guarda a ligação no banco é o campo {@code agenda} do item
+     *       (coluna {@code agenda_id} na tabela {@code item_agendamento}).</li>
+     *   <li>{@code cascade = ALL}: salvar ou apagar a agenda salva ou apaga os itens junto.</li>
+     *   <li>{@code orphanRemoval = true}: tirar um item desta lista apaga o item do banco.</li>
+     * </ul>
+     * Atenção: o item aponta de volta para a agenda. Devolver esta entidade direto como JSON causava
+     * recursão infinita; por isso os controllers devolvem {@code AgendaResponse}.
+     */
     @OneToMany(mappedBy = "agenda", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ItemAgendamento> itens = new ArrayList<>();
 
+    /** Construtor vazio exigido pelo JPA e pelo Jackson. */
     protected Agenda() {}
+
+    // Getters e setters
 
     public Long getId() {
         return id;

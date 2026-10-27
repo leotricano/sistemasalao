@@ -4,13 +4,17 @@ import br.com.leotricano.sistemasalao.model.Servico;
 
 import java.math.BigDecimal;
 
-public record ServicoResponse(Long id, String nome, String duracao, BigDecimal preco) {
+/**
+ * JSON de um serviço. Deixa de fora a lista de profissionais da entidade, que levaria de volta ao
+ * serviço e geraria recursão (Servico → Profissional → Servico...).
+ */
+public record ServicoResponse(Long id, String nome, Integer duracaoMinutos, BigDecimal preco) {
 
     public static ServicoResponse from(Servico servico) {
         return new ServicoResponse(
                 servico.getId(),
                 servico.getNome(),
-                servico.getDuracao(),
+                servico.getDuracaoMinutos(),
                 servico.getPreco()
         );
     }

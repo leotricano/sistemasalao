@@ -9,6 +9,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Endpoints de {@code /servicos} (RF02).
+ *
+ * <p>Padrão dos controllers com DTO: a entrada ainda é a entidade ({@code @RequestBody Servico}),
+ * mas a saída é sempre convertida para {@link ServicoResponse} com {@code ServicoResponse.from(...)}.
+ */
 @RestController
 @RequestMapping("/servicos")
 public class ServicoController {
@@ -19,18 +25,22 @@ public class ServicoController {
         this.servicoService = servicoService;
     }
 
+    /** {@code GET /servicos} → lista todos os serviços. */
     @GetMapping
     public List<ServicoResponse> listar() {
+        // stream().map(...).toList(): transforma cada Servico da lista em um ServicoResponse
         return servicoService.listarTodos().stream()
                 .map(ServicoResponse::from)
                 .toList();
     }
 
+    /** {@code POST /servicos} → cadastra. Exemplo: {@code {"nome":"Corte","duracaoMinutos":60,"preco":80.00}}. */
     @PostMapping
     public ServicoResponse cadastrar(@Valid @RequestBody Servico servico) {
         return ServicoResponse.from(servicoService.salvar(servico));
     }
 
+    /** {@code PUT /servicos/{id}} → atualiza nome, duração e preço; 404 se não existir. */
     @PutMapping("/{id}")
     public ResponseEntity<ServicoResponse> atualizar(@PathVariable Long id, @Valid @RequestBody Servico dadosNovos) {
         Servico atualizado = servicoService.atualizar(id, dadosNovos);
@@ -40,6 +50,7 @@ public class ServicoController {
         return ResponseEntity.ok(ServicoResponse.from(atualizado));
     }
 
+    /** {@code DELETE /servicos/{id}} → remove e responde 204. */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         servicoService.deletar(id);

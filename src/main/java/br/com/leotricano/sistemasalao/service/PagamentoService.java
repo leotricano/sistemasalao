@@ -12,6 +12,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Registro dos pagamentos de cada agendamento (RF05). Estes registros são a base do
+ * relatório de faturamento. TODO(#17): relatório por período e profissional (RF07).
+ */
 @Service
 public class PagamentoService {
 
@@ -27,6 +31,14 @@ public class PagamentoService {
         return pagamentoRepository.findByAgendaId(agendaId);
     }
 
+    /**
+     * Registra um pagamento para a agenda, com a data e hora atuais.
+     * Pode ser chamado várias vezes para a mesma agenda (pagamento dividido).
+     *
+     * <p>TODO: recusar valor que faça a soma dos pagamentos passar do total da agenda.
+     *
+     * @return o pagamento salvo, ou {@code null} se a agenda não existir
+     */
     public Pagamento registrar(Long agendaId, BigDecimal valor, FormaPagamento formaPagamento) {
         Optional<Agenda> agendaOpt = agendaRepository.findById(agendaId);
         if (agendaOpt.isEmpty()) {
@@ -37,7 +49,7 @@ public class PagamentoService {
         pagamento.setAgenda(agendaOpt.get());
         pagamento.setValor(valor);
         pagamento.setFormaPagamento(formaPagamento);
-        pagamento.setDataHora(LocalDateTime.now());
+        pagamento.setDataHora(LocalDateTime.now()); // o momento é decidido pelo servidor, não pelo cliente
 
         return pagamentoRepository.save(pagamento);
     }

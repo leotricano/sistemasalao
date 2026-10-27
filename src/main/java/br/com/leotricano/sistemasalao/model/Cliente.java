@@ -7,24 +7,34 @@ import jakarta.persistence.Id;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
-@Entity
+/**
+ * Cliente do salão (RF01). Vira a tabela {@code cliente} no banco.
+ *
+ * <p>O histórico de atendimentos (RF06) não fica aqui: ele é montado a partir das {@link Agenda}s
+ * que apontam para este cliente. TODO(#16): consulta do histórico.
+ */
+@Entity // esta classe é uma tabela; o Hibernate cria e atualiza a tabela a partir dos campos
 public class Cliente {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id // chave primária
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // o próprio PostgreSQL gera o número (1, 2, 3...)
     private Long id;
 
-    @NotBlank
+    // As anotações de validação só são checadas quando o controller usa @Valid.
+    @NotBlank // não pode ser nulo, vazio nem só espaços
     private String nome;
 
-    @Email
+    @Email // precisa ter formato de e-mail
     @NotBlank
     private String email;
 
     @NotBlank
     private String telefone;
 
+    /** Construtor vazio exigido pelo JPA e pelo Jackson (que montam o objeto e depois preenchem os campos). */
     protected Cliente(){}
+
+    // Getters e setters: usados pelo Hibernate para ler/gravar no banco e pelo Jackson para ler/gravar JSON.
 
     public String getNome() {
         return nome;

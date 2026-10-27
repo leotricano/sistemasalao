@@ -10,6 +10,10 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Endpoints de pagamento (RF05). Ficam "dentro" da agenda na URL
+ * ({@code /agendas/{agendaId}/pagamentos}) porque todo pagamento pertence a um agendamento.
+ */
 @RestController
 @RequestMapping("/agendas/{agendaId}/pagamentos")
 public class PagamentoController {
@@ -20,6 +24,7 @@ public class PagamentoController {
         this.pagamentoService = pagamentoService;
     }
 
+    /** {@code GET /agendas/{id}/pagamentos} → pagamentos já registrados para a agenda. */
     @GetMapping
     public List<PagamentoResponse> listar(@PathVariable Long agendaId) {
         return pagamentoService.listarPorAgenda(agendaId).stream()
@@ -27,6 +32,10 @@ public class PagamentoController {
                 .toList();
     }
 
+    /**
+     * {@code POST /agendas/{id}/pagamentos?valor=150&formaPagamento=PIX} → registra um pagamento.
+     * Responde 404 se a agenda não existir.
+     */
     @PostMapping
     public ResponseEntity<PagamentoResponse> registrar(@PathVariable Long agendaId,
                                                         @RequestParam BigDecimal valor,
@@ -38,6 +47,10 @@ public class PagamentoController {
         return ResponseEntity.ok(PagamentoResponse.from(pagamento));
     }
 
+    /**
+     * {@code DELETE /agendas/{agendaId}/pagamentos/{id}} → remove um pagamento lançado errado.
+     * Hoje o {@code agendaId} da URL não é conferido: apaga o pagamento pelo id.
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         pagamentoService.deletar(id);
