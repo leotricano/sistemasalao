@@ -27,10 +27,7 @@ public class Agenda {
     @NotNull
     private Cliente cliente;
 
-    /**
-     * Início do atendimento. O término é calculado somando a duração dos serviços dos itens.
-     * TODO(#12): usar esse intervalo para bloquear conflito de horário do profissional.
-     */
+    /** Início do atendimento. O término não é guardado: é calculado por {@link #calcularFim()}. */
     @NotNull
     private LocalDateTime dataHora;
 
@@ -55,6 +52,25 @@ public class Agenda {
 
     /** Construtor vazio exigido pelo JPA e pelo Jackson. */
     protected Agenda() {}
+
+    /**
+     * Soma a duração de todos os serviços desta agenda. Ex.: corte (60) + coloração (120) = 180.
+     * Os serviços acontecem em sequência, então a agenda inteira ocupa os profissionais dela
+     * durante esse tempo todo.
+     */
+    public int calcularDuracaoTotalMinutos() {
+        return itens.stream()
+                .mapToInt(item -> item.getServico().getDuracaoMinutos())
+                .sum();
+    }
+
+    /**
+     * Horário de término: início + duração total. Ex.: 14:00 + 180 min = 17:00.
+     * É usado na regra de conflito de horário (#12) e devolvido no JSON como {@code dataHoraFim}.
+     */
+    public LocalDateTime calcularFim() {
+        return dataHora.plusMinutes(calcularDuracaoTotalMinutos());
+    }
 
     // Getters e setters
 

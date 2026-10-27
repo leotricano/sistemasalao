@@ -79,7 +79,12 @@ public class AgendaController {
     /**
      * {@code POST /agendas/{id}/itens?servicoId=1&profissionalId=2} → inclui um serviço na agenda.
      * {@code @RequestParam} lê os valores depois do "?" na URL.
-     * Responde 404 se algo não existir ou se o profissional não fizer o serviço.
+     * <ul>
+     *   <li>404 se algo não existir ou se o profissional não fizer o serviço;</li>
+     *   <li>409 se o profissional já tiver outro atendimento no horário (#12). Esse caso não passa
+     *       pelo {@code if} abaixo: o service lança ConflitoHorarioException e o TratadorDeErros
+     *       monta a resposta.</li>
+     * </ul>
      */
     @PostMapping("/{agendaId}/itens")
     public ResponseEntity<AgendaResponse> adicionarItem(@PathVariable Long agendaId,
