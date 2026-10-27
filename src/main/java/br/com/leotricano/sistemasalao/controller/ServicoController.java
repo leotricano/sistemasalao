@@ -1,5 +1,6 @@
 package br.com.leotricano.sistemasalao.controller;
 
+import br.com.leotricano.sistemasalao.dto.ServicoResponse;
 import br.com.leotricano.sistemasalao.model.Servico;
 import br.com.leotricano.sistemasalao.service.ServicoService;
 import jakarta.validation.Valid;
@@ -19,22 +20,24 @@ public class ServicoController {
     }
 
     @GetMapping
-    public List<Servico> listar() {
-        return servicoService.listarTodos();
+    public List<ServicoResponse> listar() {
+        return servicoService.listarTodos().stream()
+                .map(ServicoResponse::from)
+                .toList();
     }
 
     @PostMapping
-    public Servico cadastrar(@Valid @RequestBody Servico servico) {
-        return servicoService.salvar(servico);
+    public ServicoResponse cadastrar(@Valid @RequestBody Servico servico) {
+        return ServicoResponse.from(servicoService.salvar(servico));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Servico> atualizar(@PathVariable Long id, @Valid @RequestBody Servico dadosNovos) {
+    public ResponseEntity<ServicoResponse> atualizar(@PathVariable Long id, @Valid @RequestBody Servico dadosNovos) {
         Servico atualizado = servicoService.atualizar(id, dadosNovos);
         if (atualizado == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(atualizado);
+        return ResponseEntity.ok(ServicoResponse.from(atualizado));
     }
 
     @DeleteMapping("/{id}")

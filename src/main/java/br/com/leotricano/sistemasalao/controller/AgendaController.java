@@ -1,5 +1,6 @@
 package br.com.leotricano.sistemasalao.controller;
 
+import br.com.leotricano.sistemasalao.dto.AgendaResponse;
 import br.com.leotricano.sistemasalao.model.Agenda;
 import br.com.leotricano.sistemasalao.model.StatusAgendamento;
 import br.com.leotricano.sistemasalao.service.AgendaService;
@@ -20,35 +21,37 @@ public class AgendaController {
     }
 
     @GetMapping
-    public List<Agenda> listar() {
-        return agendaService.listarTodas();
+    public List<AgendaResponse> listar() {
+        return agendaService.listarTodas().stream()
+                .map(AgendaResponse::from)
+                .toList();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Agenda> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<AgendaResponse> buscarPorId(@PathVariable Long id) {
         Agenda agenda = agendaService.buscarPorId(id);
         if (agenda == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(agenda);
+        return ResponseEntity.ok(AgendaResponse.from(agenda));
     }
 
     @PostMapping
-    public ResponseEntity<Agenda> criar(@Valid @RequestBody Agenda agenda) {
+    public ResponseEntity<AgendaResponse> criar(@Valid @RequestBody Agenda agenda) {
         Agenda criada = agendaService.criar(agenda);
         if (criada == null) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(criada);
+        return ResponseEntity.ok(AgendaResponse.from(criada));
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<Agenda> atualizarStatus(@PathVariable Long id, @RequestBody StatusAgendamento novoStatus) {
+    public ResponseEntity<AgendaResponse> atualizarStatus(@PathVariable Long id, @RequestBody StatusAgendamento novoStatus) {
         Agenda atualizada = agendaService.atualizarStatus(id, novoStatus);
         if (atualizada == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(atualizada);
+        return ResponseEntity.ok(AgendaResponse.from(atualizada));
     }
 
     @DeleteMapping("/{id}")
@@ -58,22 +61,22 @@ public class AgendaController {
     }
 
     @PostMapping("/{agendaId}/itens")
-    public ResponseEntity<Agenda> adicionarItem(@PathVariable Long agendaId,
-                                                 @RequestParam Long servicoId,
-                                                 @RequestParam Long profissionalId) {
+    public ResponseEntity<AgendaResponse> adicionarItem(@PathVariable Long agendaId,
+                                                         @RequestParam Long servicoId,
+                                                         @RequestParam Long profissionalId) {
         Agenda agenda = agendaService.adicionarItem(agendaId, servicoId, profissionalId);
         if (agenda == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(agenda);
+        return ResponseEntity.ok(AgendaResponse.from(agenda));
     }
 
     @DeleteMapping("/{agendaId}/itens/{itemId}")
-    public ResponseEntity<Agenda> removerItem(@PathVariable Long agendaId, @PathVariable Long itemId) {
+    public ResponseEntity<AgendaResponse> removerItem(@PathVariable Long agendaId, @PathVariable Long itemId) {
         Agenda agenda = agendaService.removerItem(agendaId, itemId);
         if (agenda == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(agenda);
+        return ResponseEntity.ok(AgendaResponse.from(agenda));
     }
 }

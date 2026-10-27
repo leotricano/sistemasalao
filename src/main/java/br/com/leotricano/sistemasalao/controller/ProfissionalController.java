@@ -1,5 +1,6 @@
 package br.com.leotricano.sistemasalao.controller;
 
+import br.com.leotricano.sistemasalao.dto.ProfissionalResponse;
 import br.com.leotricano.sistemasalao.model.Profissional;
 import br.com.leotricano.sistemasalao.service.ProfissionalService;
 import jakarta.validation.Valid;
@@ -19,22 +20,24 @@ public class ProfissionalController {
     }
 
     @GetMapping
-    public List<Profissional> listar() {
-        return profissionalService.listarTodos();
+    public List<ProfissionalResponse> listar() {
+        return profissionalService.listarTodos().stream()
+                .map(ProfissionalResponse::from)
+                .toList();
     }
 
     @PostMapping
-    public Profissional cadastrar(@Valid @RequestBody Profissional profissional) {
-        return profissionalService.salvar(profissional);
+    public ProfissionalResponse cadastrar(@Valid @RequestBody Profissional profissional) {
+        return ProfissionalResponse.from(profissionalService.salvar(profissional));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Profissional> atualizar(@PathVariable Long id, @Valid @RequestBody Profissional dadosNovos) {
+    public ResponseEntity<ProfissionalResponse> atualizar(@PathVariable Long id, @Valid @RequestBody Profissional dadosNovos) {
         Profissional atualizado = profissionalService.atualizar(id, dadosNovos);
         if (atualizado == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(atualizado);
+        return ResponseEntity.ok(ProfissionalResponse.from(atualizado));
     }
 
     @DeleteMapping("/{id}")
@@ -44,20 +47,20 @@ public class ProfissionalController {
     }
 
     @PostMapping("/{profissionalId}/servicos/{servicoId}")
-    public ResponseEntity<Profissional> vincularServico(@PathVariable Long profissionalId, @PathVariable Long servicoId) {
+    public ResponseEntity<ProfissionalResponse> vincularServico(@PathVariable Long profissionalId, @PathVariable Long servicoId) {
         Profissional profissional = profissionalService.vincularServico(profissionalId, servicoId);
         if (profissional == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(profissional);
+        return ResponseEntity.ok(ProfissionalResponse.from(profissional));
     }
 
     @DeleteMapping("/{profissionalId}/servicos/{servicoId}")
-    public ResponseEntity<Profissional> desvincularServico(@PathVariable Long profissionalId, @PathVariable Long servicoId) {
+    public ResponseEntity<ProfissionalResponse> desvincularServico(@PathVariable Long profissionalId, @PathVariable Long servicoId) {
         Profissional profissional = profissionalService.desvincularServico(profissionalId, servicoId);
         if (profissional == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(profissional);
+        return ResponseEntity.ok(ProfissionalResponse.from(profissional));
     }
 }

@@ -41,7 +41,7 @@ public class ProfissionalService {
 
         Profissional profissional = profissionalExistente.get();
         profissional.setNome(dadosNovos.getNome());
-        profissional.setEspecialiadade(dadosNovos.getEspecialiadade());
+        profissional.setEspecialidade(dadosNovos.getEspecialidade());
 
         return profissionalRepository.save(profissional);
     }

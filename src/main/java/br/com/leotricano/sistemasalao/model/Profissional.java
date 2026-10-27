@@ -17,7 +17,7 @@ public class Profissional {
     private String nome;
 
     @NotBlank
-    private String especialiadade;
+    private String especialidade;
 
     @ManyToMany
     @JoinTable(
@@ -37,12 +37,12 @@ public class Profissional {
         this.nome = nome;
     }
 
-    public String getEspecialiadade() {
-        return especialiadade;
+    public String getEspecialidade() {
+        return especialidade;
     }
 
-    public void setEspecialiadade(String especialiadade) {
-        this.especialiadade = especialiadade;
+    public void setEspecialidade(String especialidade) {
+        this.especialidade = especialidade;
     }
 
     public Long getId() {

@@ -1,5 +1,6 @@
 package br.com.leotricano.sistemasalao.controller;
 
+import br.com.leotricano.sistemasalao.dto.PagamentoResponse;
 import br.com.leotricano.sistemasalao.model.FormaPagamento;
 import br.com.leotricano.sistemasalao.model.Pagamento;
 import br.com.leotricano.sistemasalao.service.PagamentoService;
@@ -20,19 +21,21 @@ public class PagamentoController {
     }
 
     @GetMapping
-    public List<Pagamento> listar(@PathVariable Long agendaId) {
-        return pagamentoService.listarPorAgenda(agendaId);
+    public List<PagamentoResponse> listar(@PathVariable Long agendaId) {
+        return pagamentoService.listarPorAgenda(agendaId).stream()
+                .map(PagamentoResponse::from)
+                .toList();
     }
 
     @PostMapping
-    public ResponseEntity<Pagamento> registrar(@PathVariable Long agendaId,
-                                                @RequestParam BigDecimal valor,
-                                                @RequestParam FormaPagamento formaPagamento) {
+    public ResponseEntity<PagamentoResponse> registrar(@PathVariable Long agendaId,
+                                                        @RequestParam BigDecimal valor,
+                                                        @RequestParam FormaPagamento formaPagamento) {
         Pagamento pagamento = pagamentoService.registrar(agendaId, valor, formaPagamento);
         if (pagamento == null) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(pagamento);
+        return ResponseEntity.ok(PagamentoResponse.from(pagamento));
     }
 
     @DeleteMapping("/{id}")
