@@ -121,6 +121,7 @@ erDiagram
 | POST | `/clientes` | Cadastra cliente |
 | PUT | `/clientes/{id}` | Atualiza cliente |
 | DELETE | `/clientes/{id}` | Remove cliente |
+| GET | `/clientes/{id}/historico?status=` | Histórico do cliente: resumo + agendas da mais recente para a mais antiga (ver [Histórico do cliente](#histórico-do-cliente-16)) |
 | GET | `/servicos` | Lista serviços |
 | POST | `/servicos` | Cadastra serviço |
 | PUT | `/servicos/{id}` | Atualiza serviço |
@@ -209,6 +210,32 @@ Toda agenda nasce **AGENDADO**, mesmo que o JSON mande outro status.
 
 A API recebe um **período**, e não "dia" ou "semana": quem decide se a semana começa no domingo ou na segunda é o frontend. Assim o mesmo endpoint serve para dia, semana e, depois, o mês do relatório.
 
+### Histórico do cliente (#16)
+
+`GET /clientes/1/historico` devolve um resumo e as agendas do cliente, da **mais recente para a mais antiga**:
+
+```json
+{
+  "clienteId": 1,
+  "nomeCliente": "Ana Paula",
+  "totalAtendimentos": 2,
+  "ultimoAtendimento": "2026-10-01T10:00:00",
+  "totalGasto": 300.00,
+  "agendas": [ { "id": 18, "status": "AGENDADO", ... }, { "id": 16, "status": "CONCLUIDO", ... } ]
+}
+```
+
+| Regra | Detalhe |
+|---|---|
+| O resumo conta só agendas **CONCLUÍDAS** | Canceladas e futuras aparecem na lista, com o status, mas não entram em `totalAtendimentos`, `ultimoAtendimento` e `totalGasto` |
+| `totalGasto` soma o valor dos serviços (`precoCobrado`) | Não usa os pagamentos, que hoje podem passar do total |
+| `?status=CONCLUIDO` filtra só a lista | O resumo continua o mesmo, para o filtro não "zerar" o cliente |
+| Cliente sem agendas | 200, com lista vazia, `0` e `ultimoAtendimento: null` |
+| Cliente que não existe | 404 |
+| Status inválido | 400 |
+
+A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDataHoraDescIdDesc`. O SQL é montado a partir do nome do método, sem `@Query`.
+
 ### Regras de negócio já implementadas
 - Um item só é aceito se o profissional **faz** aquele serviço (vínculo em `profissional_servico`).
 - O preço do serviço é **copiado** para `precoCobrado` no momento do agendamento, para que um reajuste futuro não altere atendimentos antigos.
@@ -240,6 +267,7 @@ A API recebe um **período**, e não "dia" ou "semana": quem decide se a semana 
 | #13 | Tratamento de erros: exceções nos services, `TratadorDeErros` e formato único de erro | — |
 | #14 | Cancelar, reativar e remarcar, com regras de mudança de status | RF08 |
 | #15 | Consulta da agenda por período (dia, semana), profissional e status, em ordem de horário | RF04 |
+| #16 | Histórico de atendimentos do cliente, com resumo (atendimentos, último atendimento, total gasto) | RF06 |
 
 ## O que vamos fazer
 
@@ -251,7 +279,7 @@ A API recebe um **período**, e não "dia" ou "semana": quem decide se a semana 
 ### Sprint 2 (03/11 a 09/11)
 - [x] **#14** Cancelar e remarcar agendamento (RF08)
 - [x] **#15** Consultar agenda por dia, semana e profissional (RF04)
-- [ ] **#16** Histórico de atendimentos do cliente (RF06)
+- [x] **#16** Histórico de atendimentos do cliente (RF06)
 - [ ] **#28** Vários serviços por agendamento, começando pelo profissional (RF03 alterado)
 - [ ] **#29** Especialidade com pacote de serviços padrão (RF09)
 
@@ -284,6 +312,7 @@ Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp 
 | **Cancelar com pagamento é bloqueado** | Evita agenda cancelada contando no faturamento. Para cancelar, o pagamento precisa ser removido antes (estorno ainda não existe). |
 | **Cancelar em vez de apagar** | `DELETE /agendas/{id}` é para corrigir lançamento errado. Para desmarcar, o certo é cancelar, que mantém o histórico do cliente. |
 | **Filtros opcionais numa só consulta JPQL** | Cada filtro é `(:x is null or ...)`: quando o parâmetro não vem, a condição é ignorada. O `cast(:x as Tipo)` é necessário porque o PostgreSQL não descobre sozinho o tipo de um parâmetro em `? is null`. |
+| **Resumo do histórico no service** | O que conta como atendimento e como somar o gasto é regra de negócio, então o `ClienteService.historico` já devolve o `HistoricoClienteResponse` montado. As agendas são buscadas uma vez e filtradas em Java, porque o resumo precisa de todas, mesmo quando a lista vem filtrada. |
 | **Erro 500 sem detalhes** | O stack trace vai só para o log da aplicação; mandá-lo para quem chamou a API exporia o funcionamento interno. |
 | **Monolito em camadas** | Projeto de pequeno porte e desenvolvedor único; microsserviços trariam complexidade sem benefício (Tarefa 2). |
 

@@ -11,7 +11,7 @@ import jakarta.validation.constraints.NotBlank;
  * Cliente do salão (RF01). Vira a tabela {@code cliente} no banco.
  *
  * <p>O histórico de atendimentos (RF06) não fica aqui: ele é montado a partir das {@link Agenda}s
- * que apontam para este cliente. TODO(#16): consulta do histórico.
+ * que apontam para este cliente, em {@code ClienteService.historico} ({@code GET /clientes/{id}/historico}, #16).
  */
 @Entity // esta classe é uma tabela; o Hibernate cria e atualiza a tabela a partir dos campos
 public class Cliente {

@@ -16,6 +16,16 @@ import java.util.List;
 public interface AgendaRepository extends JpaRepository<Agenda, Long> {
 
     /**
+     * Todas as agendas de um cliente, da mais recente para a mais antiga (histórico, #16).
+     *
+     * <p>Esta é uma <i>consulta derivada</i>: não tem {@code @Query}, o Spring Data monta o SQL
+     * lendo o nome do método. {@code findBy} = buscar; {@code ClienteId} = {@code where cliente.id = ?};
+     * {@code OrderByDataHoraDesc} = mais recente primeiro; {@code IdDesc} desempata agendas no
+     * mesmo horário. Um erro de digitação no nome faz a aplicação nem subir, o que ajuda a achar o erro.
+     */
+    List<Agenda> findByClienteIdOrderByDataHoraDescIdDesc(Long clienteId);
+
+    /**
      * Consulta da tela de agenda (#15, RF04). Cada filtro é opcional: quando o parâmetro chega
      * {@code null}, a condição {@code :x is null or ...} vira verdadeira e o filtro é ignorado.
      * Assim uma única consulta atende "o dia", "a semana", "só o William", "só os agendados" e

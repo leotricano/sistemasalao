@@ -1,6 +1,8 @@
 package br.com.leotricano.sistemasalao.controller;
 
+import br.com.leotricano.sistemasalao.dto.HistoricoClienteResponse;
 import br.com.leotricano.sistemasalao.model.Cliente;
+import br.com.leotricano.sistemasalao.model.StatusAgendamento;
 import br.com.leotricano.sistemasalao.service.ClienteService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,7 @@ import java.util.List;
  *
  * <p>Este é o único controller que ainda devolve a entidade direto. Não dá loop porque o Cliente
  * não aponta para outras entidades. TODO: criar um ClienteResponse para manter o padrão.
+ * O histórico (#16) já usa DTO: {@code HistoricoClienteResponse}.
  */
 @RestController // cada método devolve dados (JSON), não uma página HTML
 @RequestMapping("/clientes") // prefixo de todas as rotas desta classe
@@ -49,6 +52,22 @@ public class ClienteController {
     public ResponseEntity<Void> deletar(@PathVariable Long id) { // @PathVariable pega o {id} da URL
         clienteService.deletar(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * {@code GET /clientes/{id}/historico} → histórico de atendimentos do cliente (#16, RF06):
+     * resumo (atendimentos concluídos, último atendimento, total gasto) e as agendas da mais
+     * recente para a mais antiga. {@code ?status=CONCLUIDO} deixa na lista só esse status; o
+     * resumo não muda com o filtro.
+     * <ul>
+     *   <li>404 se o cliente não existir;</li>
+     *   <li>400 se o status for inválido.</li>
+     * </ul>
+     */
+    @GetMapping("/{id}/historico")
+    public HistoricoClienteResponse historico(@PathVariable Long id,
+                                              @RequestParam(required = false) StatusAgendamento status) {
+        return clienteService.historico(id, status);
     }
 
     /** {@code PUT /clientes/{id}} → atualiza os dados; 404 se não existir. */
