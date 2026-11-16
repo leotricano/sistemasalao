@@ -9,8 +9,8 @@ import java.time.LocalDateTime;
 /**
  * Um pagamento recebido por um agendamento (RF05). Tabela {@code pagamento}.
  *
- * <p>Uma agenda pode ter vários pagamentos, por exemplo metade no Pix e metade no cartão.
- * TODO: impedir que a soma dos pagamentos passe do total da agenda (hoje a API aceita).
+ * <p>Uma agenda pode ter vários pagamentos, por exemplo metade no Pix e metade no cartão. A soma
+ * deles não passa do total do atendimento (regra no PagamentoService, #37).
  */
 @Entity
 public class Pagamento {

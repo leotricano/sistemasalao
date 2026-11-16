@@ -4,7 +4,9 @@ import br.com.leotricano.sistemasalao.exception.RecursoNaoEncontradoException;
 import br.com.leotricano.sistemasalao.exception.RegraNegocioException;
 import br.com.leotricano.sistemasalao.model.Agenda;
 import br.com.leotricano.sistemasalao.model.FormaPagamento;
+import br.com.leotricano.sistemasalao.model.ItemAgendamento;
 import br.com.leotricano.sistemasalao.model.Pagamento;
+import br.com.leotricano.sistemasalao.model.StatusAgendamento;
 import br.com.leotricano.sistemasalao.repository.AgendaRepository;
 import br.com.leotricano.sistemasalao.repository.PagamentoRepository;
 import org.springframework.stereotype.Service;
@@ -38,10 +40,12 @@ public class PagamentoService {
      * Registra um pagamento para a agenda, com a data e hora atuais.
      * Pode ser chamado várias vezes para a mesma agenda (pagamento dividido).
      *
-     * <p>TODO: recusar valor que faça a soma dos pagamentos passar do total da agenda.
+     * <p>A soma dos pagamentos não pode passar do total do atendimento (#37). Sem essa regra, um
+     * valor digitado errado (ex.: 1500 em vez de 150) inflaria o "recebido" do relatório (RF07).
      *
      * @throws RecursoNaoEncontradoException se a agenda não existir (404)
-     * @throws RegraNegocioException se o valor for zero ou negativo (400)
+     * @throws RegraNegocioException (400) se o valor for zero ou negativo, se a agenda estiver
+     *         cancelada ou se o pagamento passar do que falta pagar
      */
     public Pagamento registrar(Long agendaId, BigDecimal valor, FormaPagamento formaPagamento) {
         Agenda agenda = buscarAgenda(agendaId);
@@ -49,6 +53,25 @@ public class PagamentoService {
         // compareTo em vez de "<=": BigDecimal é objeto e não aceita os operadores de comparação
         if (valor.compareTo(BigDecimal.ZERO) <= 0) {
             throw new RegraNegocioException("O valor do pagamento precisa ser maior que zero.");
+        }
+
+        if (agenda.getStatus() == StatusAgendamento.CANCELADO) {
+            throw new RegraNegocioException("Agendamento cancelado não recebe pagamento.");
+        }
+
+        // Quanto ainda falta = total dos serviços - o que já foi pago
+        BigDecimal total = agenda.getItens().stream()
+                .map(ItemAgendamento::getPrecoCobrado)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal jaPago = pagamentoRepository.findByAgendaId(agendaId).stream()
+                .map(Pagamento::getValor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal falta = total.subtract(jaPago);
+
+        if (valor.compareTo(falta) > 0) {
+            throw new RegraNegocioException(String.format(
+                    "O pagamento de R$ %.2f passa do total. Total do atendimento: R$ %.2f; já pago: R$ %.2f; falta: R$ %.2f.",
+                    valor, total, jaPago, falta));
         }
 
         Pagamento pagamento = new Pagamento();
