@@ -64,7 +64,8 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     /** Telas do frontend, servidas pela própria API depois do {@code npm run build}. */
-    private static final String[] TELAS = {"/", "/index.html", "/assets/**", "/favicon.svg", "/error"};
+    private static final String[] TELAS = {"/", "/index.html", "/assets/**", "/favicon.svg", "/error",
+            "/manifest.json", "/icone-*.png", "/apple-touch-icon.png"}; // atalho no celular (#43)
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

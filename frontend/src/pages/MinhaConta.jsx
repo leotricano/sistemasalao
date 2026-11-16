@@ -28,6 +28,7 @@ export default function MinhaConta() {
       </section>
 
       <MeuEmail />
+      <UsarComoAplicativo />
 
       <form className="cartao pilha" onSubmit={trocar} style={{ maxWidth: 420 }}>
         <h2>Trocar senha</h2>
@@ -70,5 +71,20 @@ function MeuEmail() {
       <label className="campo">E-mail<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
       <button disabled={acao.ocupado}>Salvar e-mail</button>
     </form>
+  )
+}
+
+/** Passo a passo para pôr o sistema na tela inicial do celular, como um aplicativo (#43). */
+function UsarComoAplicativo() {
+  return (
+    <section className="cartao pilha" style={{ maxWidth: 420 }}>
+      <h2>Usar como aplicativo no celular</h2>
+      <p className="muted" style={{ margin: 0 }}>Abra o sistema no navegador do celular, entre com “Manter conectado” marcado e:</p>
+      <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+        <li><strong>Android (Chrome):</strong> menu ⋮ → “Adicionar à tela inicial”.</li>
+        <li><strong>iPhone (Safari):</strong> botão Compartilhar → “Adicionar à Tela de Início”.</li>
+      </ul>
+      <p className="muted" style={{ margin: 0 }}>O ícone da tesoura aparece junto dos outros aplicativos.</p>
+    </section>
   )
 }

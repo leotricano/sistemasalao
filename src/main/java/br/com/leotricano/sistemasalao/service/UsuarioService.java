@@ -37,6 +37,9 @@ public class UsuarioService {
     /** Quanto tempo o token vale: um dia de trabalho no salão. Depois disso, é preciso entrar de novo. */
     private static final long HORAS_DE_VALIDADE = 12;
 
+    /** Com "Manter conectado" (#43): 30 dias, para o celular de cada profissional não pedir senha todo dia. */
+    private static final long DIAS_CONECTADO = 30;
+
     private final UsuarioRepository usuarioRepository;
     private final ProfissionalRepository profissionalRepository;
     private final PasswordEncoder passwordEncoder;
@@ -62,7 +65,9 @@ public class UsuarioService {
                 .orElseThrow(() -> new NaoAutenticadoException("Login ou senha incorretos."));
 
         Instant agora = Instant.now();
-        Instant expiraEm = agora.plus(HORAS_DE_VALIDADE, ChronoUnit.HOURS);
+        Instant expiraEm = Boolean.TRUE.equals(dados.manterConectado())
+                ? agora.plus(DIAS_CONECTADO, ChronoUnit.DAYS)
+                : agora.plus(HORAS_DE_VALIDADE, ChronoUnit.HOURS);
 
         // O que vai dentro do token. "sub" (subject) é o login; os outros campos são nossos.
         JwtClaimsSet.Builder campos = JwtClaimsSet.builder()

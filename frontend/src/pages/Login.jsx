@@ -58,6 +58,9 @@ function Entrar({ loginInicial, recuperacaoLigada, onEsqueci }) {
   const { entrar } = useSessao()
   const [login, setLogin] = useState(loginInicial.includes('@') ? '' : loginInicial)
   const [senha, setSenha] = useState('')
+  // Marcado por padrão: no celular de cada profissional, ninguém quer digitar a senha todo dia.
+  // No computador da recepção, que várias pessoas usam, dá para desmarcar.
+  const [manterConectado, setManterConectado] = useState(true)
   const [erro, setErro] = useState(null)
   const [ocupado, setOcupado] = useState(false)
 
@@ -66,7 +69,7 @@ function Entrar({ loginInicial, recuperacaoLigada, onEsqueci }) {
     setOcupado(true)
     setErro(null)
     try {
-      await entrar(login, senha)
+      await entrar(login, senha, manterConectado)
     } catch (e) {
       setErro(e)
       setOcupado(false)
@@ -83,6 +86,10 @@ function Entrar({ loginInicial, recuperacaoLigada, onEsqueci }) {
       <label className="campo">
         Senha
         <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="current-password" required />
+      </label>
+      <label className="linha" style={{ fontWeight: 600 }}>
+        <input type="checkbox" checked={manterConectado} onChange={(e) => setManterConectado(e.target.checked)} style={{ minHeight: 0 }} />
+        Manter conectado por 30 dias
       </label>
       <button className="primario" disabled={ocupado} style={{ width: '100%' }}>
         {ocupado ? 'Entrando…' : 'Entrar'}

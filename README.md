@@ -8,7 +8,7 @@ Sistema web (API REST em Spring Boot + telas em React) para agendamento, histór
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 16/11/2026 (pronto para piloto no salão):** telas em React servidas pela própria API, login com perfis (dono, recepção e profissional), cadastros, agendamento com vários serviços e profissionais, bloqueio de conflito de horário, cancelar e remarcar, agenda do dia e da semana, histórico do cliente, pagamento com troco e relatório de faturamento com planilha. Todo erro volta com status HTTP correto e mensagem em português. A API tem 42 testes automatizados e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: ajustar o conflito de horário por profissional no backend (#28), especialidade com pacote de serviços (#29) e hospedagem na nuvem (#27).
+**Situação em 16/11/2026 (pronto para piloto no salão):** telas em React servidas pela própria API, login com perfis (dono, recepção e profissional), cadastros, agendamento com vários serviços e profissionais, bloqueio de conflito de horário, cancelar e remarcar, agenda do dia e da semana, histórico do cliente, pagamento com troco e relatório de faturamento com planilha. Todo erro volta com status HTTP correto e mensagem em português. A API tem 43 testes automatizados e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: ajustar o conflito de horário por profissional no backend (#28), especialidade com pacote de serviços (#29) e hospedagem na nuvem (#27).
 
 ---
 
@@ -84,7 +84,7 @@ Os testes **não precisam do PostgreSQL**: usam o banco H2 em memória, configur
 ./mvnw test
 ```
 
-O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 42, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
+O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 43, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
 
 | Classe | Tipo | O que testa |
 |---|---|---|
@@ -134,6 +134,8 @@ O sistema roda num computador do salão, e os outros aparelhos (celular, tablet,
 | Administrador (dono) | Agenda, Novo agendamento, Clientes, Serviços, Profissionais, Relatório, Acessos |
 | Recepção | Agenda, Novo agendamento, Clientes, Serviços e Profissionais (só consulta) |
 | Profissional | Só a própria agenda |
+
+**No celular como aplicativo (#43):** abra o sistema no navegador do celular, entre com "Manter conectado" marcado e use "Adicionar à tela inicial" (Android) ou "Adicionar à Tela de Início" (iPhone). O ícone da tesoura aparece junto dos outros aplicativos. O passo a passo também está em "Minha conta".
 
 **Backup:** os dados ficam só no PostgreSQL desse computador. Faça cópia do banco com frequência, por exemplo com `pg_dump -U postgres sistemasalao > backup.sql` num pendrive ou na nuvem.
 
@@ -230,7 +232,7 @@ Todas as rotas, menos `POST /auth/login`, exigem o cabeçalho `Authorization: Be
 
 ### Login e perfis (#18)
 
-O login devolve um **token JWT** válido por 12 horas. O frontend guarda o token e o manda em toda requisição. A API não guarda sessão: a assinatura do token prova quem é a pessoa e qual o perfil dela. As senhas são gravadas só como hash **BCrypt**.
+O login devolve um **token JWT** válido por 12 horas, ou por **30 dias** com "Manter conectado" marcado (#43), para o celular de cada profissional não pedir senha todo dia. O frontend guarda o token e o manda em toda requisição. A API não guarda sessão: a assinatura do token prova quem é a pessoa e qual o perfil dela. As senhas são gravadas só como hash **BCrypt**.
 
 | Perfil | Quem é | Pode |
 |---|---|---|
@@ -402,6 +404,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 | #20 | Telas de clientes (com ficha e histórico), serviços e profissionais | RF01, RF02, RF06 |
 | #21 | Pagamento com troco e relatório de faturamento do mês com planilha para o Excel | RF05, RF07 |
 | #42 | Esqueci minha senha: código de 6 dígitos por e-mail | RNF01 |
+| #43 | Manter conectado por 30 dias e atalho na tela inicial do celular | — |
 
 ## O que vamos fazer
 
