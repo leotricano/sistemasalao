@@ -1,2 +1,2 @@
-/mvnw text eol=lf
+# Scripts do Windows precisam de fim de linha CRLF para o cmd.exe ler direito
 *.cmd text eol=crlf
