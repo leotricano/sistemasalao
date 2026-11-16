@@ -8,7 +8,7 @@ API REST em Spring Boot para agendamento, histórico de clientes e controle de p
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 27/10/2026:** Sprint 1 concluída. Cadastros, agendamento com vários itens e pagamentos funcionam. Os JSONs de resposta usam DTOs, a duração dos serviços é guardada em minutos a API recusa horários sobrepostos para o mesmo profissional e todo erro volta com status HTTP correto e mensagem em português. Agendamentos podem ser cancelados, reativados e remarcados com regras de status (Sprint 2 em andamento). Próximos: filtros da agenda, histórico e relatório.
+**Situação em 16/11/2026 (MVP, Tarefa 4):** cadastros, agendamento com vários serviços, bloqueio de conflito de horário, cancelar e remarcar, consulta da agenda, histórico do cliente, pagamentos e relatório de faturamento funcionam. Todo erro volta com status HTTP correto e mensagem em português. A API tem 29 testes automatizados (unidade e integração) e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: vários serviços começando pelo profissional (#28), especialidade com pacote (#29), autenticação (#18) e frontend.
 
 ---
 
@@ -65,6 +65,25 @@ O projeto usa `spring.jpa.hibernate.ddl-auto=update`, que **cria** tabelas e col
 | 27/10/2026 | #11: duração do serviço passou de texto para minutos (rode **antes** de subir a aplicação) | `ALTER TABLE servico ALTER COLUMN duracao TYPE integer USING duracao::integer;`<br>`ALTER TABLE servico RENAME COLUMN duracao TO duracao_minutos;` |
 
 > Isso deve ser substituído por migrações versionadas com Flyway (ver Próximos passos).
+
+### 6. Rodar os testes
+Os testes **não precisam do PostgreSQL**: usam o banco H2 em memória, configurado em `src/test/resources/application.properties`, que nasce vazio a cada execução.
+
+```bash
+./mvnw test
+```
+
+O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 29, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
+
+| Classe | Tipo | O que testa |
+|---|---|---|
+| `AgendaServiceTest` | Unidade (Mockito) | Conflito de horário, regras de status, remarcar, filtros da agenda |
+| `RelatorioServiceTest` | Unidade (Mockito) | Cálculos do relatório: totais, ticket médio, por profissional e por forma de pagamento |
+| `PagamentoServiceTest` | Unidade (Mockito) | Valor positivo e pagamento da agenda certa |
+| `RotasPrincipaisTest` | Integração (MockMvc + H2) | As rotas de ponta a ponta: cadastros, agendamento, 409, pagamento, conclusão, relatório, histórico e erros 400/404/409 |
+| `SistemasalaoApplicationTests` | Integração | A aplicação sobe |
+
+Nos testes de unidade, os repositórios são *mocks* (objetos falsos do Mockito) e só a regra do service é testada. Nos de integração, a aplicação sobe inteira e as requisições passam por controller, service, repositório e banco. As entidades têm construtor `protected`, então os testes criam objetos pela classe `Fabrica`, que fica no mesmo pacote `model` dentro de `src/test`.
 
 ---
 
@@ -297,6 +316,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 | #16 | Histórico de atendimentos do cliente, com resumo (atendimentos, último atendimento, total gasto) | RF06 |
 | #31 | Estratégia de branches (GitHub Flow) e proteção da `master` com ruleset | — |
 | #17 | Relatório de faturamento por período e profissional | RF07 |
+| #26 | Testes automatizados: unidade (JUnit + Mockito) e integração das rotas (MockMvc + H2) | — |
 
 ## O que vamos fazer
 
@@ -323,7 +343,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 - [ ] **#21** Frontend: pagamento e relatório
 
 ### Backlog
-Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp (#24), IA para prever faltas (#25), testes automatizados (#26), Docker e deploy (#27).
+Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp (#24), IA para prever faltas (#25), Docker e deploy (#27).
 
 ---
 
@@ -398,4 +418,3 @@ O PR exige **0 aprovações** porque o projeto tem um único desenvolvedor; o PR
 | A API aceita pagamentos acima do total do agendamento | sem card ainda |
 | A maioria das entradas (`@RequestBody`) ainda recebe entidades; só o remarcar já usa DTO de entrada (`RemarcarRequest`) | DTOs de entrada, sem card ainda |
 | Mudanças de esquema do banco são feitas com SQL manual | Flyway, sem card ainda |
-| Não há testes automatizados | #26 |
