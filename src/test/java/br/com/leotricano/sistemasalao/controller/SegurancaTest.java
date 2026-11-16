@@ -14,6 +14,10 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.time.Duration;
+import java.time.Instant;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -105,6 +109,23 @@ class SegurancaTest {
         mvc.perform(get("/relatorios/faturamento").param("de", "2030-01-01").param("ate", "2030-01-31")
                         .header(HttpHeaders.AUTHORIZATION, token))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Manter conectado: o login vale 30 dias em vez de 12 horas (#43)")
+    void manterConectadoValeTrintaDias() throws Exception {
+        String curto = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"admin\",\"senha\":\"%s\"}".formatted(SENHA_ADMIN)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String longo = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"admin\",\"senha\":\"%s\",\"manterConectado\":true}".formatted(SENHA_ADMIN)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        Instant agora = Instant.now();
+        Instant expiraCurto = Instant.parse(JsonPath.read(curto, "$.expiraEm"));
+        Instant expiraLongo = Instant.parse(JsonPath.read(longo, "$.expiraEm"));
+        assertThat(expiraCurto).isBefore(agora.plus(Duration.ofHours(13)));
+        assertThat(expiraLongo).isAfter(agora.plus(Duration.ofDays(29)));
     }
 
     @Test
