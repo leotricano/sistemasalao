@@ -3,6 +3,7 @@ package br.com.leotricano.sistemasalao.repository;
 import br.com.leotricano.sistemasalao.model.Pagamento;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 
 /** Acesso à tabela {@code pagamento}. */
@@ -21,4 +22,10 @@ public interface PagamentoRepository extends JpaRepository<Pagamento, Long> {
      * Usada para impedir o cancelamento de agenda já paga (#14).
      */
     boolean existsByAgendaId(Long agendaId);
+
+    /**
+     * Pagamentos de várias agendas de uma vez (relatório de faturamento, #17). O sufixo {@code In}
+     * gera {@code where agenda_id in (...)}: uma consulta só, em vez de uma por agenda.
+     */
+    List<Pagamento> findByAgendaIdIn(Collection<Long> agendaIds);
 }
