@@ -1,6 +1,6 @@
 // Minha conta (#18): dados de quem está logado e troca da própria senha.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { useSessao } from '../sessao.jsx'
 import { Erro, Sucesso, useAcao } from '../componentes.jsx'
@@ -27,6 +27,8 @@ export default function MinhaConta() {
         <p><strong>{usuario.nome}</strong> · login <span className="mono">{usuario.login}</span> · {rotuloPerfil[usuario.perfil]}</p>
       </section>
 
+      <MeuEmail />
+
       <form className="cartao pilha" onSubmit={trocar} style={{ maxWidth: 420 }}>
         <h2>Trocar senha</h2>
         <Erro erro={acao.erro} />
@@ -38,5 +40,35 @@ export default function MinhaConta() {
         <button className="primario" disabled={acao.ocupado || naoConfere}>Trocar senha</button>
       </form>
     </>
+  )
+}
+
+/**
+ * E-mail para o "esqueci minha senha" (#42). Busca o valor atual em GET /auth/me e salva em PUT /auth/me.
+ */
+function MeuEmail() {
+  const [email, setEmail] = useState('')
+  const acao = useAcao()
+
+  useEffect(() => {
+    api('/auth/me').then((eu) => setEmail(eu.email ?? '')).catch(() => {})
+  }, [])
+
+  async function salvar(evento) {
+    evento.preventDefault()
+    const salvo = await acao.rodar(() => api('/auth/me', { metodo: 'PUT', corpo: { email } }),
+      email.trim() ? 'E-mail salvo. Se esquecer a senha, o código chega nele.' : 'E-mail removido.')
+    if (salvo) setEmail(salvo.email ?? '')
+  }
+
+  return (
+    <form className="cartao pilha" onSubmit={salvar} style={{ maxWidth: 420 }}>
+      <h2>Meu e-mail</h2>
+      <p className="muted" style={{ margin: 0 }}>Usado só para mandar o código quando você esquecer a senha.</p>
+      <Erro erro={acao.erro} />
+      <Sucesso texto={acao.sucesso} />
+      <label className="campo">E-mail<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
+      <button disabled={acao.ocupado}>Salvar e-mail</button>
+    </form>
   )
 }

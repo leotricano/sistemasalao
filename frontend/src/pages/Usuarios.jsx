@@ -6,7 +6,7 @@ import { useSessao } from '../sessao.jsx'
 import { Carregando, Erro, Sucesso, useAcao, useCarregar } from '../componentes.jsx'
 import { rotuloPerfil } from '../formato.js'
 
-const vazio = { nome: '', login: '', senha: '', perfil: 'RECEPCAO', profissionalId: '' }
+const vazio = { nome: '', login: '', email: '', senha: '', perfil: 'RECEPCAO', profissionalId: '' }
 
 export default function Usuarios() {
   const { usuario } = useSessao()
@@ -36,6 +36,7 @@ export default function Usuarios() {
       <form className="cartao formulario" onSubmit={criar}>
         <label className="campo">Nome<input value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} required /></label>
         <label className="campo">Login<input value={novo.login} onChange={(e) => setNovo({ ...novo, login: e.target.value })} autoComplete="off" required /></label>
+        <label className="campo">E-mail (para recuperar a senha)<input type="email" value={novo.email} onChange={(e) => setNovo({ ...novo, email: e.target.value })} autoComplete="off" placeholder="opcional" /></label>
         <label className="campo">Senha inicial<input type="password" minLength={6} value={novo.senha} onChange={(e) => setNovo({ ...novo, senha: e.target.value })} autoComplete="new-password" required /></label>
         <label className="campo">
           Perfil
@@ -60,12 +61,13 @@ export default function Usuarios() {
       <section className="cartao tabela-rolavel">
         {!usuarios.dados ? <Carregando /> : (
           <table>
-            <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th /></tr></thead>
+            <thead><tr><th>Nome</th><th>Login</th><th>E-mail</th><th>Perfil</th><th /></tr></thead>
             <tbody>
               {usuarios.dados.map((u) => (
                 <tr key={u.id}>
                   <td><strong>{u.nome}</strong></td>
                   <td className="mono">{u.login}</td>
+                  <td className="muted">{u.email ?? '—'}</td>
                   <td>{rotuloPerfil[u.perfil]}{u.nomeProfissional ? ` · ${u.nomeProfissional}` : ''}</td>
                   <td className="direita">
                     {u.id !== usuario.id && (
