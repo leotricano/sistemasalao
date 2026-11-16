@@ -1,16 +1,21 @@
 package br.com.leotricano.sistemasalao.controller;
 
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -25,13 +30,29 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * requisições HTTP sem precisar abrir uma porta de rede, como se fosse o Postman.
  *
  * <p>Cada teste cria os próprios dados, em datas diferentes de 2030, para um não atrapalhar o outro.
+ *
+ * <p>Login (#18): toda requisição destes testes vai como o dono do salão (perfil ADMIN). O
+ * {@code jwt()} do spring-security-test simula um token já conferido. As regras de cada perfil
+ * são testadas em {@code SegurancaTest}.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 class RotasPrincipaisTest {
 
     @Autowired
+    private WebApplicationContext contexto;
+
     private MockMvc mvc;
+
+    /** Monta o MockMvc com a segurança ligada e um ADMIN logado em toda requisição ({@code defaultRequest}). */
+    @BeforeEach
+    void entrarComoAdmin() {
+        mvc = MockMvcBuilders.webAppContextSetup(contexto)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(jwt()
+                        .jwt(token -> token.subject("admin").claim("uid", 1L).claim("perfil", "ADMIN"))
+                        .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .build();
+    }
 
     // ---------- ajudantes: cada um faz uma chamada e devolve o id criado ----------
 
