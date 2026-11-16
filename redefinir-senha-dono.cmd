@@ -33,6 +33,6 @@ set "OPCAO=--redefinir-senha"
 if not "%~1"=="" set "OPCAO=--redefinir-senha=%~1"
 
 rem web-application-type=none: nao abre o site, so roda a troca de senha e fecha
-"%JAVA%" -jar target\sistemasalao-0.0.1-SNAPSHOT.jar %OPCAO% --spring.main.web-application-type=none --spring.main.banner-mode=off --logging.level.root=WARN
+"%JAVA%" -jar target\sistemasalao-0.0.1-SNAPSHOT.jar %OPCAO% --spring.main.web-application-type=none --spring.main.banner-mode=off --logging.level.root=WARN --spring.jpa.show-sql=false
 echo.
 pause
