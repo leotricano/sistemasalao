@@ -268,6 +268,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 | #14 | Cancelar, reativar e remarcar, com regras de mudança de status | RF08 |
 | #15 | Consulta da agenda por período (dia, semana), profissional e status, em ordem de horário | RF04 |
 | #16 | Histórico de atendimentos do cliente, com resumo (atendimentos, último atendimento, total gasto) | RF06 |
+| #31 | Estratégia de branches (GitHub Flow) e proteção da `master` com ruleset | — |
 
 ## O que vamos fazer
 
@@ -295,6 +296,51 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 
 ### Backlog
 Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp (#24), IA para prever faltas (#25), testes automatizados (#26), Docker e deploy (#27).
+
+---
+
+## Estratégia de branches
+
+O projeto segue o **GitHub Flow**: a `master` guarda sempre a versão estável, e toda mudança é feita num branch próprio, ligado a um card do [quadro de tarefas](https://github.com/users/leotricano/projects/1), que só entra na `master` por Pull Request.
+
+**Por que GitHub Flow e não Git Flow:** o Git Flow usa vários branches fixos (`develop`, `release`, `hotfix`) e foi pensado para equipes grandes com versões programadas. Este é um projeto individual com entregas contínuas por sprint, então um único branch estável mais branches curtos por tarefa dão o mesmo controle com muito menos trabalho.
+
+### Nomes dos branches
+
+`tipo/numero-do-card-descricao-curta`
+
+| Tipo | Uso | Exemplo |
+|---|---|---|
+| `feature/` | funcionalidade nova | `feature/17-relatorio-faturamento` |
+| `fix/` | correção de bug | `fix/40-pagamento-acima-do-total` |
+| `test/` | testes automatizados | `test/26-testes-agenda` |
+| `docs/` | documentação | `docs/31-estrategia-branches` |
+
+O número liga o branch ao card, e quem lê o nome já sabe qual tarefa ele resolve.
+
+### Fluxo de trabalho
+
+1. Atualizar a `master`: `git switch master` e `git pull`.
+2. Criar o branch do card: `git switch -c feature/17-relatorio-faturamento`.
+3. Fazer commits pequenos, um por passo lógico, com mensagem descritiva.
+4. Enviar o branch: `git push -u origin feature/17-relatorio-faturamento`.
+5. Abrir o Pull Request para a `master` com `Closes #17` na descrição, o que fecha o card no merge.
+6. Conferir o diff do PR e fazer o merge.
+7. O GitHub apaga o branch remoto sozinho; o local sai com `git switch master`, `git pull` e `git branch -d feature/17-relatorio-faturamento`.
+
+### Proteção da `master`
+
+O ruleset `proteger-master` do GitHub garante que o fluxo seja seguido:
+
+| Regra | O que impede |
+|---|---|
+| Exigir Pull Request antes do merge | push direto na `master`: toda mudança passa por PR e fica registrada |
+| Bloquear force push | reescrever ou apagar o histórico da `master` |
+| Restringir exclusão | apagar a `master` por engano |
+
+O PR exige **0 aprovações** porque o projeto tem um único desenvolvedor; o PR serve como ponto de conferência e registro. O repositório também apaga automaticamente o branch depois do merge, para que a lista de branches mostre só o que está em andamento.
+
+> Até 16/11/2026 (cards #1 a #16) os commits eram feitos direto na `master`. A estratégia vale a partir do card #31.
 
 ---
 
