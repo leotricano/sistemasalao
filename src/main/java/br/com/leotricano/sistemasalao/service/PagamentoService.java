@@ -15,7 +15,7 @@ import java.util.List;
 
 /**
  * Registro dos pagamentos de cada agendamento (RF05). Estes registros são a base do
- * relatório de faturamento. TODO(#17): relatório por período e profissional (RF07).
+ * relatório de faturamento ({@link RelatorioService}, #17).
  */
 @Service
 public class PagamentoService {
