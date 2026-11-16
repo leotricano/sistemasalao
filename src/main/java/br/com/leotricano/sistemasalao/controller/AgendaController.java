@@ -1,13 +1,17 @@
 package br.com.leotricano.sistemasalao.controller;
 
+import br.com.leotricano.sistemasalao.config.UsuarioLogado;
 import br.com.leotricano.sistemasalao.dto.AgendaResponse;
 import br.com.leotricano.sistemasalao.dto.RemarcarRequest;
+import br.com.leotricano.sistemasalao.exception.RecursoNaoEncontradoException;
 import br.com.leotricano.sistemasalao.model.Agenda;
 import br.com.leotricano.sistemasalao.model.StatusAgendamento;
 import br.com.leotricano.sistemasalao.service.AgendaService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -41,6 +45,8 @@ public class AgendaController {
      * Sem filtro nenhum, devolve tudo. {@code required = false} torna o parâmetro opcional
      * (chega {@code null} quando não vem na URL), e {@code @DateTimeFormat(iso = DATE)} lê a data
      * no formato {@code aaaa-mm-dd}.
+     * <p>Perfil PROFISSIONAL (#18): o filtro {@code profissionalId} é sempre o dele, mesmo que a
+     * URL peça outro. Assim cada profissional vê só os próprios horários (RNF01).
      * <ul>
      *   <li>400 se só uma das datas vier, se {@code de} for depois de {@code ate}, se o período
      *       passar de 62 dias ou se uma data/status estiver em formato inválido;</li>
@@ -52,16 +58,31 @@ public class AgendaController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate de,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate ate,
             @RequestParam(required = false) Long profissionalId,
-            @RequestParam(required = false) StatusAgendamento status) {
+            @RequestParam(required = false) StatusAgendamento status,
+            @AuthenticationPrincipal Jwt jwt) {
+        UsuarioLogado usuario = UsuarioLogado.de(jwt);
+        if (usuario.ehProfissional()) {
+            profissionalId = usuario.profissionalId();
+        }
         return agendaService.listar(de, ate, profissionalId, status).stream()
                 .map(AgendaResponse::from)
                 .toList();
     }
 
-    /** {@code GET /agendas/{id}} → detalhe de um agendamento; 404 se não existir. */
+    /**
+     * {@code GET /agendas/{id}} → detalhe de um agendamento; 404 se não existir. Para o perfil
+     * PROFISSIONAL, agenda em que ele não atende também dá 404 (#18): para ele, ela não existe.
+     */
     @GetMapping("/{id}")
-    public AgendaResponse buscarPorId(@PathVariable Long id) {
-        return AgendaResponse.from(agendaService.buscarPorId(id));
+    public AgendaResponse buscarPorId(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        Agenda agenda = agendaService.buscarPorId(id);
+        UsuarioLogado usuario = UsuarioLogado.de(jwt);
+        boolean atendeNela = agenda.getItens().stream()
+                .anyMatch(item -> item.getProfissional().getId().equals(usuario.profissionalId()));
+        if (usuario.ehProfissional() && !atendeNela) {
+            throw new RecursoNaoEncontradoException("Agenda " + id + " não encontrada.");
+        }
+        return AgendaResponse.from(agenda);
     }
 
     /**
