@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
  *   <tr><td>MethodArgumentTypeMismatchException</td><td>400</td><td>parâmetro de URL com valor inválido</td></tr>
  *   <tr><td>MissingServletRequestParameterException</td><td>400</td><td>parâmetro de URL obrigatório ausente</td></tr>
  *   <tr><td>NaoAutenticadoException</td><td>401</td><td>login ou senha errados (#18)</td></tr>
+ *   <tr><td>AcessoNegadoException</td><td>403</td><td>primeiro acesso fora do computador do salão (#46)</td></tr>
  *   <tr><td>ConflitoHorarioException</td><td>409</td><td>profissional já ocupado no horário</td></tr>
  *   <tr><td>DataIntegrityViolationException</td><td>409</td><td>apagar algo que está em uso</td></tr>
  *   <tr><td>qualquer outra</td><td>500</td><td>erro inesperado (detalhe só no log)</td></tr>
@@ -59,6 +60,12 @@ public class TratadorDeErros {
     @ExceptionHandler(NaoAutenticadoException.class)
     public ResponseEntity<ErroResponse> tratarNaoAutenticado(NaoAutenticadoException e) {
         return responder(HttpStatus.UNAUTHORIZED, e.getMessage());
+    }
+
+    /** Ação proibida de onde foi pedida (ex.: primeiro acesso fora do computador do salão, #46) → 403. */
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<ErroResponse> tratarAcessoNegado(AcessoNegadoException e) {
+        return responder(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
     /** Regra do salão violada → 400. */

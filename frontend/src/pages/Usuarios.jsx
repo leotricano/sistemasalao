@@ -1,4 +1,5 @@
-// Acessos ao sistema (#18): o dono cria o login da recepção e de cada profissional.
+// Acessos ao sistema (#18): o dono cria o login da recepção e de cada profissional, e cria uma
+// senha nova para quem esqueceu a dele (#46).
 
 import { useState } from 'react'
 import { api } from '../api.js'
@@ -13,6 +14,9 @@ export default function Usuarios() {
   const usuarios = useCarregar(() => api('/usuarios'), [])
   const profissionais = useCarregar(() => api('/profissionais'), [])
   const [novo, setNovo] = useState(vazio)
+  // Para quem estamos criando uma senha nova (#46): { id, nome } ou null
+  const [redefinindo, setRedefinindo] = useState(null)
+  const [senhaNova, setSenhaNova] = useState('')
   const acao = useAcao()
 
   async function executar(funcao, mensagem) {
@@ -26,6 +30,16 @@ export default function Usuarios() {
     const corpo = { ...novo, profissionalId: novo.perfil === 'PROFISSIONAL' ? Number(novo.profissionalId) : null }
     if (await executar(() => api('/usuarios', { metodo: 'POST', corpo }), `Acesso de ${novo.nome} criado. Passe o login e a senha para a pessoa.`)) {
       setNovo(vazio)
+    }
+  }
+
+  async function redefinir(evento) {
+    evento.preventDefault()
+    const { id, nome } = redefinindo
+    if (await executar(() => api(`/usuarios/${id}/senha`, { metodo: 'PUT', corpo: { novaSenha: senhaNova } }),
+      `Senha nova de ${nome} criada. Passe para a pessoa e peça para ela trocar em Minha conta.`)) {
+      setRedefinindo(null)
+      setSenhaNova('')
     }
   }
 
@@ -58,6 +72,17 @@ export default function Usuarios() {
       <Erro erro={acao.erro ?? usuarios.erro} />
       <Sucesso texto={acao.sucesso} />
 
+      {redefinindo && (
+        <form className="cartao formulario" onSubmit={redefinir}>
+          <label className="campo">
+            Senha nova para {redefinindo.nome}
+            <input type="password" minLength={6} value={senhaNova} onChange={(e) => setSenhaNova(e.target.value)} autoComplete="new-password" autoFocus required />
+          </label>
+          <button className="primario" disabled={acao.ocupado}>Salvar senha nova</button>
+          <button type="button" onClick={() => { setRedefinindo(null); setSenhaNova('') }}>Cancelar</button>
+        </form>
+      )}
+
       <section className="cartao tabela-rolavel">
         {!usuarios.dados ? <Carregando /> : (
           <table>
@@ -70,6 +95,12 @@ export default function Usuarios() {
                   <td className="muted">{u.email ?? '—'}</td>
                   <td>{rotuloPerfil[u.perfil]}{u.nomeProfissional ? ` · ${u.nomeProfissional}` : ''}</td>
                   <td className="direita">
+                    {u.id !== usuario.id && (
+                      <button className="pequeno" disabled={acao.ocupado} style={{ marginRight: 8 }}
+                        onClick={() => { setRedefinindo({ id: u.id, nome: u.nome }); setSenhaNova('') }}>
+                        Redefinir senha
+                      </button>
+                    )}
                     {u.id !== usuario.id && (
                       <button className="pequeno perigo" disabled={acao.ocupado}
                         onClick={() => window.confirm(`Remover o acesso de ${u.nome}?`) && executar(() => api(`/usuarios/${u.id}`, { metodo: 'DELETE' }), 'Acesso removido.')}>

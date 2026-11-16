@@ -22,6 +22,11 @@ export function SessaoProvider({ children }) {
   /** manterConectado (#43): o login vale 30 dias neste aparelho em vez de 12 horas. */
   async function entrar(login, senha, manterConectado = false) {
     const resposta = await api('/auth/login', { metodo: 'POST', corpo: { login, senha, manterConectado } })
+    aceitarLogin(resposta)
+  }
+
+  /** Guarda um login que a API já devolveu pronto (ex.: o primeiro acesso do dono, #46). */
+  function aceitarLogin(resposta) {
     salvarSessao(resposta)
     setSessao(resposta)
   }
@@ -36,6 +41,7 @@ export function SessaoProvider({ children }) {
   const valor = {
     usuario,
     entrar,
+    aceitarLogin,
     sair,
     ehAdmin: perfil === 'ADMIN',
     ehProfissional: perfil === 'PROFISSIONAL',

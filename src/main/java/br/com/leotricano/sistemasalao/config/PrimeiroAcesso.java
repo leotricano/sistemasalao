@@ -8,15 +8,17 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
-import java.security.SecureRandom;
-
 /**
- * Garante que dá para entrar no sistema na primeira vez (#18). Um {@code ApplicationRunner} roda
- * uma vez, logo depois que a aplicação sobe.
+ * Garante que dá para entrar no sistema na primeira vez (#18, #46). Um {@code ApplicationRunner}
+ * roda uma vez, logo depois que a aplicação sobe.
  *
- * <p>Se o banco ainda não tem nenhum usuário, cria o administrador com o login de
- * {@code ADMIN_LOGIN} (padrão "admin") e a senha de {@code ADMIN_SENHA}. Sem {@code ADMIN_SENHA},
- * sorteia uma senha e mostra no console uma única vez. Nos dois casos, troque a senha no primeiro acesso.
+ * <p>Se o banco ainda não tem nenhum usuário:
+ * <ul>
+ *   <li>com {@code ADMIN_SENHA} definida, cria o administrador com o login de {@code ADMIN_LOGIN}
+ *       (padrão "admin") e essa senha;</li>
+ *   <li>sem ela, não cria nada: a tela de login mostra "Criar a conta do dono", que só funciona
+ *       no computador onde o sistema roda (ver {@code AuthController.primeiroAcesso}).</li>
+ * </ul>
  */
 @Component
 public class PrimeiroAcesso implements ApplicationRunner {
@@ -37,27 +39,15 @@ public class PrimeiroAcesso implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        boolean sorteada = senha == null || senha.isBlank();
-        String senhaInicial = sorteada ? sortearSenha() : senha;
-
-        if (usuarioService.criarAdministradorSeNaoHouverUsuarios(login, senhaInicial)) {
-            if (sorteada) {
-                log.warn("Primeiro acesso: administrador criado. Login: {}  Senha: {}  (anote e troque no primeiro acesso)",
-                        login, senhaInicial);
-            } else {
+        if (args.containsOption(RedefinirSenhaPeloComputador.OPCAO)) {
+            return; // modo do redefinir-senha-dono.cmd: ele mesmo cuida das contas
+        }
+        if (senha != null && !senha.isBlank()) {
+            if (usuarioService.criarAdministradorSeNaoHouverUsuarios(login, senha)) {
                 log.info("Primeiro acesso: administrador '{}' criado com a senha de ADMIN_SENHA.", login);
             }
+        } else if (usuarioService.semUsuarios()) {
+            log.warn("Nenhum usuário ainda. Abra http://localhost:8080 NESTE computador para criar a conta do dono.");
         }
-    }
-
-    /** 10 caracteres sem os que se confundem (0/O, 1/l/I). */
-    private static String sortearSenha() {
-        String letras = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
-        SecureRandom sorteio = new SecureRandom();
-        StringBuilder senha = new StringBuilder();
-        for (int i = 0; i < 10; i++) {
-            senha.append(letras.charAt(sorteio.nextInt(letras.length())));
-        }
-        return senha.toString();
     }
 }

@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Login e cadastro de usuários (#18, RNF01).
@@ -177,18 +178,79 @@ public class UsuarioService {
         usuarioRepository.delete(buscarEntidade(id));
     }
 
+    /**
+     * O administrador cria uma senha nova para alguém que esqueceu a dele (#46). Não pede a senha
+     * antiga: quem esqueceu não sabe. Apaga também um código de "esqueci minha senha" pendente.
+     */
+    public void redefinirSenha(Long id, String novaSenha) {
+        Usuario usuario = buscarEntidade(id);
+        usuario.setSenhaHash(passwordEncoder.encode(novaSenha));
+        usuario.setCodigoRecuperacaoHash(null);
+        usuario.setCodigoRecuperacaoExpiraEm(null);
+        usuario.setCodigoRecuperacaoTentativas(null);
+        usuarioRepository.save(usuario);
+    }
+
+    /** {@code true} enquanto ninguém tem acesso: a tela de login mostra "Primeiro acesso" (#46). */
+    public boolean semUsuarios() {
+        return usuarioRepository.count() == 0;
+    }
+
+    /**
+     * Primeiro acesso pela tela (#46): cria a conta do dono, só se o sistema ainda não tiver usuários.
+     * {@code synchronized} impede que dois pedidos ao mesmo tempo criem dois "primeiros" donos.
+     *
+     * @throws RegraNegocioException (400) se já houver algum usuário
+     */
+    public synchronized UsuarioResponse criarPrimeiroAdministrador(String nome, String login, String senha) {
+        if (!semUsuarios()) {
+            throw new RegraNegocioException("O sistema já tem usuários. Entre com o seu login.");
+        }
+        return UsuarioResponse.from(salvarAdministrador(nome, login, senha));
+    }
+
     /** Cria o primeiro administrador, se ainda não houver nenhum usuário. Ver {@code PrimeiroAcesso}. */
     public boolean criarAdministradorSeNaoHouverUsuarios(String login, String senha) {
-        if (usuarioRepository.count() > 0) {
+        if (!semUsuarios()) {
             return false;
         }
+        salvarAdministrador("Administrador", login, senha);
+        return true;
+    }
+
+    /**
+     * Usado pelo {@code redefinir-senha-dono.cmd}, que só roda no computador do salão (#46): se o
+     * login existir, troca a senha; se não existir, cria um administrador com esse login.
+     *
+     * @param nome usado só quando o login não existe
+     * @return {@code true} se criou uma conta nova, {@code false} se só trocou a senha
+     */
+    public boolean definirSenhaPeloComputador(String login, String nome, String senha) {
+        var existente = usuarioRepository.findByLogin(normalizar(login));
+        if (existente.isPresent()) {
+            redefinirSenha(existente.get().getId(), senha);
+            return false;
+        }
+        salvarAdministrador(nome, login, senha);
+        return true;
+    }
+
+    /** Procura pelo login, para o script mostrar de quem é a conta antes de trocar a senha. */
+    public Optional<UsuarioResponse> buscarPorLogin(String login) {
+        return usuarioRepository.findByLogin(normalizar(login)).map(UsuarioResponse::from);
+    }
+
+    private Usuario salvarAdministrador(String nome, String login, String senha) {
+        String loginLimpo = normalizar(login);
+        if (usuarioRepository.existsByLogin(loginLimpo)) {
+            throw new RegraNegocioException("Já existe um usuário com o login '" + loginLimpo + "'.");
+        }
         Usuario admin = new Usuario();
-        admin.setNome("Administrador");
-        admin.setLogin(normalizar(login));
+        admin.setNome(nome.trim());
+        admin.setLogin(loginLimpo);
         admin.setSenhaHash(passwordEncoder.encode(senha));
         admin.setPerfil(Perfil.ADMIN);
-        usuarioRepository.save(admin);
-        return true;
+        return usuarioRepository.save(admin);
     }
 
     private Usuario buscarEntidade(Long id) {
