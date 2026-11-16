@@ -1,6 +1,6 @@
 # Sistema de Gestão para Salão de Beleza
 
-API REST em Spring Boot para agendamento, histórico de clientes e controle de pagamentos de um salão de beleza. Projeto de Extensão em Computação Avançada (SM262208, 2026/2) de **Leonardo Tricano Costa**, desenvolvido para o salão parceiro **Studio WL** (Cachambi, Rio de Janeiro).
+Sistema web (API REST em Spring Boot + telas em React) para agendamento, histórico de clientes e controle de pagamentos de um salão de beleza. Projeto de Extensão em Computação Avançada (SM262208, 2026/2) de **Leonardo Tricano Costa**, desenvolvido para o salão parceiro **Studio WL** (Cachambi, Rio de Janeiro).
 
 | | |
 |---|---|
@@ -8,7 +8,7 @@ API REST em Spring Boot para agendamento, histórico de clientes e controle de p
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 16/11/2026 (MVP, Tarefa 4):** cadastros, agendamento com vários serviços, bloqueio de conflito de horário, cancelar e remarcar, consulta da agenda, histórico do cliente, pagamentos e relatório de faturamento funcionam. Todo erro volta com status HTTP correto e mensagem em português. A API tem login com perfis e 38 testes automatizados (unidade e integração) e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: vários serviços começando pelo profissional (#28), especialidade com pacote (#29) e frontend.
+**Situação em 16/11/2026 (pronto para piloto no salão):** telas em React servidas pela própria API, login com perfis (dono, recepção e profissional), cadastros, agendamento com vários serviços e profissionais, bloqueio de conflito de horário, cancelar e remarcar, agenda do dia e da semana, histórico do cliente, pagamento com troco e relatório de faturamento com planilha. Todo erro volta com status HTTP correto e mensagem em português. A API tem 38 testes automatizados e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: ajustar o conflito de horário por profissional no backend (#28), especialidade com pacote de serviços (#29) e hospedagem na nuvem (#27).
 
 ---
 
@@ -20,7 +20,8 @@ API REST em Spring Boot para agendamento, histórico de clientes e controle de p
 | Framework | Spring Boot 4.1.1 (Web MVC, Data JPA, Validation, Security) |
 | Banco de dados | PostgreSQL 15 |
 | Build | Maven (wrapper `mvnw` incluído) |
-| Frontend (planejado) | React |
+| Frontend | React 18 + Vite 5 (pasta `frontend/`) |
+| Login | Spring Security + token JWT |
 
 Arquitetura monolítica em camadas: **Controller → Service → Repository → Entidades**, conforme a Tarefa 2.
 
@@ -90,6 +91,45 @@ O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 38, Failures: 0, Errors: 0
 | `SistemasalaoApplicationTests` | Integração | A aplicação sobe |
 
 Nos testes de unidade, os repositórios são *mocks* (objetos falsos do Mockito) e só a regra do service é testada. Nos de integração, a aplicação sobe inteira e as requisições passam por controller, service, repositório e banco. As entidades têm construtor `protected`, então os testes criam objetos pela classe `Fabrica`, que fica no mesmo pacote `model` dentro de `src/test`.
+
+---
+
+### 7. Telas (frontend)
+As telas ficam em `frontend/` e conversam com a API. Para trabalhar nelas, com a API rodando:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Abra `http://localhost:5173`. O Vite repassa as chamadas da API para `http://localhost:8080` (ver `frontend/vite.config.js`) e recarrega a tela a cada arquivo salvo.
+
+`npm run build` gera as telas prontas em `src/main/resources/static/` (fora do Git). A partir daí a própria API serve o sistema inteiro em `http://localhost:8080`, sem precisar do Node.
+
+---
+
+## Colocar em uso no salão
+
+O sistema roda num computador do salão, e os outros aparelhos (celular, tablet, outro computador) acessam pela rede Wi-Fi.
+
+**No computador do salão, uma vez:**
+1. Instale o **Java 21** e o **PostgreSQL 15** e crie o banco `sistemasalao` (ver "Como rodar").
+2. Crie as variáveis de ambiente do Windows: `DB_PASSWORD`, `JWT_SECRET` (uma frase longa e aleatória) e, se quiser escolher a senha inicial, `ADMIN_SENHA`.
+3. Para gerar o sistema, instale também o **Node.js 20+** e rode `gerar-sistema.cmd`. Ele monta as telas, roda os testes e cria `target/sistemasalao-0.0.1-SNAPSHOT.jar`.
+4. Libere a porta 8080 no Firewall do Windows para a rede privada, se os outros aparelhos não conseguirem abrir.
+
+**Todo dia:** rode `iniciar-sistema.cmd` e deixe a janela aberta. Acesse `http://localhost:8080` no próprio computador, ou `http://IP-DO-COMPUTADOR:8080` nos outros aparelhos (o IP aparece em `ipconfig`, "Endereço IPv4").
+
+**Primeiro acesso:** entre como `admin` com a senha de `ADMIN_SENHA` (ou a sorteada que aparece na janela do sistema), troque a senha em "Minha conta" e crie em "Acessos" o login da recepção e de cada profissional.
+
+| Perfil | O que vê no menu |
+|---|---|
+| Administrador (dono) | Agenda, Novo agendamento, Clientes, Serviços, Profissionais, Relatório, Acessos |
+| Recepção | Agenda, Novo agendamento, Clientes, Serviços e Profissionais (só consulta) |
+| Profissional | Só a própria agenda |
+
+**Backup:** os dados ficam só no PostgreSQL desse computador. Faça cópia do banco com frequência, por exemplo com `pg_dump -U postgres sistemasalao > backup.sql` num pendrive ou na nuvem.
 
 ---
 
@@ -345,6 +385,10 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 | #17 | Relatório de faturamento por período e profissional | RF07 |
 | #26 | Testes automatizados: unidade (JUnit + Mockito) e integração das rotas (MockMvc + H2) | — |
 | #18 | Login com token JWT e perfis ADMIN, RECEPCAO e PROFISSIONAL; profissional vê só a própria agenda | RNF01 |
+| #37 | Pagamento não passa do total do atendimento | RF05 |
+| #19 | Telas em React: login, menu por perfil, agenda do dia e da semana, novo agendamento no fluxo pedido pelo dono, detalhe do atendimento | RF03, RF04 |
+| #20 | Telas de clientes (com ficha e histórico), serviços e profissionais | RF01, RF02, RF06 |
+| #21 | Pagamento com troco e relatório de faturamento do mês com planilha para o Excel | RF05, RF07 |
 
 ## O que vamos fazer
 
@@ -366,9 +410,9 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 - [ ] **#30** Exportar relatório para Excel (RF10)
 
 ### Sprint 4 (17/11 a 30/11)
-- [ ] **#19** Frontend: configuração do React, login e agenda
-- [ ] **#20** Frontend: clientes e serviços
-- [ ] **#21** Frontend: pagamento e relatório
+- [x] **#19** Frontend: configuração do React, login e agenda
+- [x] **#20** Frontend: clientes e serviços
+- [x] **#21** Frontend: pagamento e relatório
 
 ### Backlog
 Comissões (#22), agendamento online pelo cliente (#23), lembretes por WhatsApp (#24), IA para prever faltas (#25), Docker e deploy (#27).
@@ -437,6 +481,9 @@ O PR exige **0 aprovações** porque o projeto tem um único desenvolvedor; o PR
 | **Filtros opcionais numa só consulta JPQL** | Cada filtro é `(:x is null or ...)`: quando o parâmetro não vem, a condição é ignorada. O `cast(:x as Tipo)` é necessário porque o PostgreSQL não descobre sozinho o tipo de um parâmetro em `? is null`. |
 | **Resumo do histórico no service** | O que conta como atendimento e como somar o gasto é regra de negócio, então o `ClienteService.historico` já devolve o `HistoricoClienteResponse` montado. As agendas são buscadas uma vez e filtradas em Java, porque o resumo precisa de todas, mesmo quando a lista vem filtrada. |
 | **Erro 500 sem detalhes** | O stack trace vai só para o log da aplicação; mandá-lo para quem chamou a API exporia o funcionamento interno. |
+| **Telas servidas pela própria API** | O `npm run build` coloca o React dentro do `.jar`. No salão roda um programa só, sem servidor web separado. |
+| **HashRouter nas telas** | As rotas das telas ficam depois do `#` (`/#/clientes`), então nunca se confundem com as rotas da API (`/clientes`). |
+| **Novo agendamento no front, em partes** | A tela cria a agenda e inclui um serviço por vez. Se um serviço for recusado (ex.: 409), apaga a agenda recém-criada para não sobrar agendamento pela metade. |
 | **Monolito em camadas** | Projeto de pequeno porte e desenvolvedor único; microsserviços trariam complexidade sem benefício (Tarefa 2). |
 
 ## Problemas conhecidos

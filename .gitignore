@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Frontend (#19) ###
+frontend/node_modules/
+# Gerado pelo "npm run build": as telas prontas que a API serve. Não vai para o Git.
+src/main/resources/static/

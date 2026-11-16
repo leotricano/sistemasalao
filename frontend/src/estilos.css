@@ -1,0 +1,215 @@
+/* Visual do sistema (#19), com as mesmas cores e fontes do protótipo "Tesoura" da Tarefa 3.
+   As cores são variáveis (tokens): o modo escuro só troca os valores, não as regras. */
+
+:root {
+  --bg: #F5F4F7;
+  --surface: #FFFFFF;
+  --sunk: #EFEDF3;
+  --ink: #1E1A27;
+  --muted: #686277;
+  --line: #E2DFE9;
+  --accent: #A3245A;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #F7E4EC;
+  --ok: #23774F;
+  --ok-soft: #E1F3EA;
+  --warn: #9A6312;
+  --warn-soft: #FBEFD9;
+  --bad: #B42318;
+  --bad-soft: #FBE5E2;
+  --shadow: 0 1px 2px rgba(30, 26, 39, .06), 0 8px 24px rgba(30, 26, 39, .06);
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141219;
+    --surface: #1D1A24;
+    --sunk: #25212E;
+    --ink: #EEEAF5;
+    --muted: #A49EB2;
+    --line: #322D3D;
+    --accent: #E46A9D;
+    --accent-ink: #1A0F15;
+    --accent-soft: #3A1F2C;
+    --ok: #5CC499;
+    --ok-soft: #173327;
+    --warn: #E3B15A;
+    --warn-soft: #382A12;
+    --bad: #F2806F;
+    --bad-soft: #3B1A16;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--f-body);
+}
+
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.2; margin: 0 0 .5rem; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.15rem; }
+h3 { font-size: 1rem; }
+a { color: var(--accent); }
+.mono { font-family: var(--f-mono); }
+.muted { color: var(--muted); }
+.direita { text-align: right; }
+
+/* ---------- estrutura ---------- */
+
+.topo {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 1rem;
+  padding: .6rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.marca { display: flex; align-items: center; gap: .5rem; font: 700 1.1rem var(--f-display); color: var(--ink); text-decoration: none; }
+.marca img { width: 28px; height: 28px; }
+.menu { display: flex; gap: .25rem; overflow-x: auto; flex: 1; scrollbar-width: none; }
+.menu a {
+  padding: .4rem .7rem; border-radius: 8px; white-space: nowrap;
+  color: var(--muted); text-decoration: none; font-weight: 600;
+}
+.menu a:hover { background: var(--sunk); color: var(--ink); }
+.menu a.active { background: var(--accent-soft); color: var(--accent); }
+.conta { display: flex; align-items: center; gap: .5rem; white-space: nowrap; margin-left: auto; }
+.conta a { color: var(--ink); text-decoration: none; font-weight: 600; }
+.conta a:hover { color: var(--accent); }
+
+/* Telas médias: o menu desce para uma linha própria, sem cortar itens */
+@media (max-width: 1100px) {
+  .topo { flex-wrap: wrap; row-gap: .4rem; }
+  .menu { order: 3; flex-basis: 100%; }
+}
+
+main { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+
+.cabecalho { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.cabecalho h1 { margin: 0; }
+
+.cartao {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.grade { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.linha { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.linha.fim { justify-content: flex-end; }
+.pilha > * + * { margin-top: .75rem; }
+
+/* ---------- formulários ---------- */
+
+label.campo { display: flex; flex-direction: column; gap: .25rem; font-weight: 600; font-size: .9rem; }
+input, select, textarea {
+  font: inherit; color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: .5rem .65rem;
+  min-height: 40px;
+}
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.formulario { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: end; }
+
+button, .botao {
+  font: 600 .95rem var(--f-body);
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  min-height: 40px; padding: .45rem .9rem;
+  border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink);
+  cursor: pointer; text-decoration: none;
+}
+button:hover, .botao:hover { background: var(--sunk); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.primario { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.primario:hover { background: var(--accent); filter: brightness(1.08); }
+.perigo { color: var(--bad); border-color: var(--bad-soft); }
+.perigo:hover { background: var(--bad-soft); }
+.pequeno { min-height: 32px; padding: .25rem .6rem; font-size: .85rem; }
+
+.escolhas { display: flex; flex-wrap: wrap; gap: .4rem; }
+.escolha {
+  border-radius: 999px; padding: .35rem .8rem; min-height: 36px;
+  border: 1px solid var(--line); background: var(--surface); font-weight: 600;
+}
+.escolha[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* ---------- mensagens e etiquetas ---------- */
+
+.aviso { border-radius: 8px; padding: .6rem .8rem; margin-bottom: 1rem; font-weight: 500; }
+.aviso.erro { background: var(--bad-soft); color: var(--bad); }
+.aviso.ok { background: var(--ok-soft); color: var(--ok); }
+
+.etiqueta { display: inline-block; border-radius: 999px; padding: .1rem .55rem; font-size: .8rem; font-weight: 700; }
+.etiqueta.AGENDADO { background: var(--warn-soft); color: var(--warn); }
+.etiqueta.CONCLUIDO { background: var(--ok-soft); color: var(--ok); }
+.etiqueta.CANCELADO { background: var(--sunk); color: var(--muted); text-decoration: line-through; }
+.etiqueta.neutra { background: var(--sunk); color: var(--muted); }
+
+/* ---------- tabelas ---------- */
+
+.tabela-rolavel { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: .55rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+tr.clicavel { cursor: pointer; }
+tr.clicavel:hover td { background: var(--sunk); }
+
+/* ---------- agenda ---------- */
+
+.dia + .dia { margin-top: 1.25rem; }
+.dia > h2 { text-transform: capitalize; }
+.atendimento {
+  display: grid; grid-template-columns: 92px 1fr auto; gap: .75rem; align-items: center;
+  padding: .75rem; border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: var(--r); background: var(--surface); color: inherit; text-decoration: none;
+}
+.atendimento + .atendimento { margin-top: .5rem; }
+.atendimento:hover { background: var(--sunk); }
+.atendimento.CANCELADO { border-left-color: var(--line); opacity: .7; }
+.atendimento.CONCLUIDO { border-left-color: var(--ok); }
+.atendimento .horario { font: 500 1rem var(--f-mono); }
+.vazio { text-align: center; padding: 2rem 1rem; color: var(--muted); }
+
+/* ---------- relatório ---------- */
+
+.indicadores { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 1rem; }
+.indicador { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: .85rem 1rem; }
+.indicador .rotulo { color: var(--muted); font-size: .85rem; font-weight: 600; }
+.indicador .valor { font: 700 1.5rem var(--f-display); margin-top: .15rem; }
+.indicador .detalhe { color: var(--muted); font-size: .8rem; }
+
+.barras { display: grid; gap: .6rem; }
+.barra-linha { display: grid; grid-template-columns: minmax(90px, 160px) 1fr auto; gap: .75rem; align-items: center; }
+.barra-trilho { position: relative; height: 22px; }
+.barra { height: 100%; min-width: 4px; background: var(--accent); border-radius: 0 4px 4px 0; }
+.barra-linha:hover .barra { filter: brightness(1.1); }
+
+/* ---------- login ---------- */
+
+.tela-login { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
+.tela-login .cartao { width: 100%; max-width: 380px; padding: 1.5rem; }
+
+@media (max-width: 640px) {
+  .conta .perfil { display: none; }
+  .atendimento { grid-template-columns: 70px 1fr; }
+  .atendimento > :last-child { grid-column: 2; }
+  h1 { font-size: 1.35rem; }
+}
