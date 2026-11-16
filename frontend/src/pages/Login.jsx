@@ -1,6 +1,7 @@
-// Tela de login (#19, RNF01) e "esqueci minha senha" (#42).
+// Tela de login (#19, RNF01), "esqueci minha senha" (#42) e primeiro acesso do dono (#46).
 // Entrar: POST /auth/login. Esqueci: POST /auth/esqueci-senha manda um código por e-mail, e
-// POST /auth/redefinir-senha troca a senha com esse código.
+// POST /auth/redefinir-senha troca a senha com esse código. Sistema recém-instalado, sem nenhum
+// usuário: POST /auth/primeiro-acesso cria a conta do dono (só no computador do salão).
 
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
@@ -12,11 +13,12 @@ export default function Login() {
   const [etapa, setEtapa] = useState('entrar')
   const [loginOuEmail, setLoginOuEmail] = useState('')
   const [aviso, setAviso] = useState(null)
-  const [recuperacaoLigada, setRecuperacaoLigada] = useState(false)
+  const [opcoes, setOpcoes] = useState({ recuperacaoPorEmail: false, primeiroAcesso: false })
 
-  // Só mostra "Esqueci minha senha" se o e-mail do salão estiver configurado na API
+  // A API diz o que mostrar: "Esqueci minha senha" só com o e-mail do salão configurado, e
+  // "Criar a conta do dono" só enquanto não existe nenhum usuário
   useEffect(() => {
-    api('/auth/opcoes').then((o) => setRecuperacaoLigada(o.recuperacaoPorEmail)).catch(() => {})
+    api('/auth/opcoes').then(setOpcoes).catch(() => {})
   }, [])
 
   const irPara = (proxima, mensagem = null) => {
@@ -35,8 +37,9 @@ export default function Login() {
           </div>
         </div>
         <Sucesso texto={aviso} />
-        {etapa === 'entrar' && (
-          <Entrar loginInicial={loginOuEmail} recuperacaoLigada={recuperacaoLigada}
+        {opcoes.primeiroAcesso && <CriarDono />}
+        {!opcoes.primeiroAcesso && etapa === 'entrar' && (
+          <Entrar loginInicial={loginOuEmail} recuperacaoLigada={opcoes.recuperacaoPorEmail}
             onEsqueci={(login) => { setLoginOuEmail(login); irPara('pedirCodigo') }} />
         )}
         {etapa === 'pedirCodigo' && (
@@ -94,11 +97,15 @@ function Entrar({ loginInicial, recuperacaoLigada, onEsqueci }) {
       <button className="primario" disabled={ocupado} style={{ width: '100%' }}>
         {ocupado ? 'Entrando…' : 'Entrar'}
       </button>
-      {recuperacaoLigada && (
+      {recuperacaoLigada ? (
         <button type="button" className="pequeno" style={{ border: 0, background: 'none', color: 'var(--accent)' }}
           onClick={() => onEsqueci(login)}>
           Esqueci minha senha
         </button>
+      ) : (
+        <p className="muted" style={{ margin: 0, fontSize: '.85rem', textAlign: 'center' }}>
+          Esqueceu a senha? Peça ao dono do salão para criar uma nova em Acessos.
+        </p>
       )}
     </form>
   )
@@ -171,6 +178,48 @@ function Redefinir({ loginOuEmail, onPronto, onVoltar }) {
       </label>
       <button className="primario" disabled={ocupado || codigo.length !== 6}>{ocupado ? 'Salvando…' : 'Criar senha nova'}</button>
       <button type="button" className="pequeno" onClick={onVoltar}>Pedir outro código</button>
+    </form>
+  )
+}
+
+// Sistema recém-instalado (#46): o dono cria a própria conta. A API só aceita se o pedido vier do
+// próprio computador do salão; de outro aparelho, mostra o erro explicando.
+function CriarDono() {
+  const { aceitarLogin } = useSessao()
+  const [dados, setDados] = useState({ nome: '', login: '', senha: '', repetida: '' })
+  const [erro, setErro] = useState(null)
+  const [ocupado, setOcupado] = useState(false)
+  const mudar = (campo) => (e) => setDados({ ...dados, [campo]: e.target.value })
+
+  async function enviar(evento) {
+    evento.preventDefault()
+    if (dados.senha !== dados.repetida) {
+      setErro(new Error('As duas senhas não são iguais.'))
+      return
+    }
+    setOcupado(true)
+    setErro(null)
+    try {
+      const { nome, login, senha } = dados
+      aceitarLogin(await api('/auth/primeiro-acesso', { metodo: 'POST', corpo: { nome, login, senha } }))
+    } catch (e) {
+      setErro(e)
+      setOcupado(false)
+    }
+  }
+
+  return (
+    <form className="pilha" onSubmit={enviar}>
+      <h2 style={{ margin: 0 }}>Criar a conta do dono</h2>
+      <p className="muted" style={{ margin: 0 }}>
+        O sistema ainda não tem nenhum acesso. Crie o seu: você será o administrador e depois cria o acesso da equipe em Acessos.
+      </p>
+      <Erro erro={erro} />
+      <label className="campo">Seu nome<input value={dados.nome} onChange={mudar('nome')} autoFocus required /></label>
+      <label className="campo">Login<input value={dados.login} onChange={mudar('login')} autoCapitalize="none" autoComplete="username" required /></label>
+      <label className="campo">Senha<input type="password" minLength={6} value={dados.senha} onChange={mudar('senha')} autoComplete="new-password" required /></label>
+      <label className="campo">Repita a senha<input type="password" minLength={6} value={dados.repetida} onChange={mudar('repetida')} autoComplete="new-password" required /></label>
+      <button className="primario" disabled={ocupado}>{ocupado ? 'Criando…' : 'Criar conta e entrar'}</button>
     </form>
   )
 }

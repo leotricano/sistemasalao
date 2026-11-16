@@ -8,7 +8,7 @@ Sistema web (API REST em Spring Boot + telas em React) para agendamento, histór
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 16/11/2026 (pronto para piloto no salão):** telas em React servidas pela própria API, login com perfis (dono, recepção e profissional), cadastros, agendamento com vários serviços e profissionais, bloqueio de conflito de horário, cancelar e remarcar, agenda do dia e da semana, histórico do cliente, pagamento com troco e relatório de faturamento com planilha. Todo erro volta com status HTTP correto e mensagem em português. A API tem 43 testes automatizados e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: ajustar o conflito de horário por profissional no backend (#28), especialidade com pacote de serviços (#29) e hospedagem na nuvem (#27).
+**Situação em 16/11/2026 (pronto para piloto no salão):** telas em React servidas pela própria API, login com perfis (dono, recepção e profissional), cadastros, agendamento com vários serviços e profissionais, bloqueio de conflito de horário, cancelar e remarcar, agenda do dia e da semana, histórico do cliente, pagamento com troco e relatório de faturamento com planilha. Todo erro volta com status HTTP correto e mensagem em português. A API tem 46 testes automatizados e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: ajustar o conflito de horário por profissional no backend (#28), especialidade com pacote de serviços (#29) e hospedagem na nuvem (#27).
 
 ---
 
@@ -47,7 +47,7 @@ CREATE DATABASE sistemasalao;
 | `DB_USERNAME` | não | `postgres` |
 | `JWT_SECRET` | recomendada | sem ela, uma chave é sorteada a cada início e todos precisam entrar de novo depois de reiniciar |
 | `ADMIN_LOGIN` | não | `admin` |
-| `ADMIN_SENHA` | não | sem ela, a senha do primeiro administrador é sorteada e aparece **uma vez** no console |
+| `ADMIN_SENHA` | não | sem ela, a conta do dono é criada pela tela de login no primeiro acesso (#46) |
 
 | `MAIL_HOST` | não | sem ela, o "esqueci minha senha" fica desligado (ex.: `smtp.gmail.com`) |
 | `MAIL_USUARIO` | com `MAIL_HOST` | o e-mail do salão que envia o código |
@@ -84,7 +84,7 @@ Os testes **não precisam do PostgreSQL**: usam o banco H2 em memória, configur
 ./mvnw test
 ```
 
-O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 43, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
+O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 46, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
 
 | Classe | Tipo | O que testa |
 |---|---|---|
@@ -94,6 +94,7 @@ O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 43, Failures: 0, Errors: 0
 | `RotasPrincipaisTest` | Integração (MockMvc + H2) | As rotas de ponta a ponta: cadastros, agendamento, 409, pagamento, conclusão, relatório, histórico e erros 400/404/409 |
 | `SegurancaTest` | Integração (MockMvc + H2) | Login real com token, 401 sem token ou com token adulterado, 403 por perfil, profissional vendo só a própria agenda, troca de senha |
 | `RecuperacaoSenhaTest` | Integração (MockMvc + H2, e-mail simulado) | Código por e-mail, código errado, 5 tentativas, código usado não serve de novo, resposta igual para quem não existe, e-mail da própria conta |
+| `AcessoSemEmailTest` | Integração (MockMvc + H2, banco sem usuários) | Primeiro acesso só do próprio computador e só sem usuários, administrador redefinindo senha (e recepção recebendo 403), chave reserva do computador |
 | `SistemasalaoApplicationTests` | Integração | A aplicação sobe |
 
 Nos testes de unidade, os repositórios são *mocks* (objetos falsos do Mockito) e só a regra do service é testada. Nos de integração, a aplicação sobe inteira e as requisições passam por controller, service, repositório e banco. As entidades têm construtor `protected`, então os testes criam objetos pela classe `Fabrica`, que fica no mesmo pacote `model` dentro de `src/test`.
@@ -127,7 +128,15 @@ O sistema roda num computador do salão, e os outros aparelhos (celular, tablet,
 
 **Todo dia:** rode `iniciar-sistema.cmd` e deixe a janela aberta. Acesse `http://localhost:8080` no próprio computador, ou `http://IP-DO-COMPUTADOR:8080` nos outros aparelhos (o IP aparece em `ipconfig`, "Endereço IPv4").
 
-**Primeiro acesso:** entre como `admin` com a senha de `ADMIN_SENHA` (ou a sorteada que aparece na janela do sistema), troque a senha em "Minha conta" e crie em "Acessos" o login da recepção e de cada profissional.
+**Primeiro acesso (#46):** com o banco vazio, abra `http://localhost:8080` **no próprio computador do salão**. A tela mostra "Criar a conta do dono": informe nome, login e senha e o sistema já entra. De outro aparelho essa tela é recusada, para ninguém da rede se adiantar. Depois crie em "Acessos" o login da recepção e de cada profissional. (Se `ADMIN_SENHA` estiver definida, o sistema cria o `admin` com ela em vez de mostrar a tela.)
+
+**Se alguém esquecer a senha (sem e-mail, #46):**
+
+| Quem esqueceu | O que fazer |
+|---|---|
+| Recepção ou profissional | O dono abre "Acessos", clica em **Redefinir senha** na pessoa e passa a senha nova. A pessoa troca depois em "Minha conta". |
+| Um dos donos | O outro administrador faz o mesmo em "Acessos". Por isso vale ter **dois administradores** (ex.: o dono e quem cuida do sistema). |
+| Todos os administradores | No computador do salão, rode `redefinir-senha-dono.cmd` (ou `redefinir-senha-dono.cmd login`). Ele pergunta o login e a senha nova, sem mostrar o que é digitado, e grava direto no banco. Se o login não existir, cria um administrador com ele. Só funciona nesse computador, porque precisa do banco e da `DB_PASSWORD`. |
 
 | Perfil | O que vê no menu |
 |---|---|
@@ -188,7 +197,7 @@ erDiagram
 
 ## Endpoints
 
-Todas as rotas, menos `POST /auth/login`, exigem o cabeçalho `Authorization: Bearer <token>` (ver [Login e perfis](#login-e-perfis-18)). Sem token, a resposta é `401`; com um perfil sem permissão, `403`.
+Todas as rotas, menos as marcadas como "aberta", exigem o cabeçalho `Authorization: Bearer <token>` (ver [Login e perfis](#login-e-perfis-18)). Sem token, a resposta é `401`; com um perfil sem permissão, `403`.
 
 | Método | Rota | O que faz |
 |---|---|---|
@@ -196,11 +205,13 @@ Todas as rotas, menos `POST /auth/login`, exigem o cabeçalho `Authorization: Be
 | GET | `/auth/me` | Dados de quem está logado |
 | PUT | `/auth/senha` | Troca a própria senha (`{"senhaAtual":"...","novaSenha":"..."}`) |
 | PUT | `/auth/me` | Cadastra ou troca o próprio e-mail (`{"email":"..."}`) |
-| GET | `/auth/opcoes` | Se o "esqueci minha senha" está ligado (aberta) |
+| GET | `/auth/opcoes` | Se o "esqueci minha senha" está ligado e se é o primeiro acesso (aberta) |
+| POST | `/auth/primeiro-acesso` | Cria a conta do dono quando não há usuários (`{"nome","login","senha"}`, aberta, só do próprio computador) |
 | POST | `/auth/esqueci-senha` | Manda o código por e-mail (`{"loginOuEmail":"..."}`, aberta) |
 | POST | `/auth/redefinir-senha` | Cria a senha nova com o código (`{"loginOuEmail","codigo","novaSenha"}`, aberta) |
 | GET | `/usuarios` | Lista os acessos (ADMIN) |
 | POST | `/usuarios` | Cria um acesso (ADMIN) |
+| PUT | `/usuarios/{id}/senha` | Cria uma senha nova para alguém (`{"novaSenha":"..."}`, ADMIN) |
 | DELETE | `/usuarios/{id}` | Remove um acesso (ADMIN) |
 | GET | `/clientes` | Lista clientes |
 | POST | `/clientes` | Cadastra cliente |
@@ -242,7 +253,9 @@ O login devolve um **token JWT** válido por 12 horas, ou por **30 dias** com "M
 
 **Esqueci minha senha (#42):** com o e-mail do salão configurado (`MAIL_HOST`, `MAIL_USUARIO`, `MAIL_SENHA`), a tela de login mostra "Esqueci minha senha". A pessoa informa o login ou o e-mail, recebe um código de 6 dígitos e cria uma senha nova. O código vale 15 minutos e aceita 5 tentativas, e é guardado só como hash. A resposta é a mesma exista ou não o usuário, para ninguém descobrir quem tem cadastro. O e-mail de cada pessoa é cadastrado pelo dono em "Acessos" ou pela própria pessoa em "Minha conta".
 
-**Primeiro acesso:** se o banco não tem nenhum usuário, o sistema cria o administrador ao subir (login `ADMIN_LOGIN`, senha `ADMIN_SENHA` ou sorteada e mostrada no console). Troque a senha no primeiro acesso.
+**Primeiro acesso (#46):** se o banco não tem nenhum usuário, `GET /auth/opcoes` responde `"primeiroAcesso": true` e a tela de login mostra "Criar a conta do dono". `POST /auth/primeiro-acesso` cria o ADMIN e já devolve o token, mas só aceita pedidos vindos do próprio computador (endereço de loopback, `127.0.0.1`); de outro aparelho, `403`. Com `ADMIN_SENHA` definida, o sistema cria o administrador `ADMIN_LOGIN` ao subir e a tela não aparece.
+
+**Sem e-mail (#46):** o administrador cria uma senha nova para qualquer pessoa com `PUT /usuarios/{id}/senha`, sem precisar da antiga. Se nenhum administrador lembrar a senha, `redefinir-senha-dono.cmd` sobe a aplicação em modo de terminal (`--redefinir-senha`, sem abrir o site), pergunta login e senha nova e grava no banco (classe `RedefinirSenhaPeloComputador`).
 
 ### Respostas de erro
 
@@ -405,6 +418,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 | #21 | Pagamento com troco e relatório de faturamento do mês com planilha para o Excel | RF05, RF07 |
 | #42 | Esqueci minha senha: código de 6 dígitos por e-mail | RNF01 |
 | #43 | Manter conectado por 30 dias e atalho na tela inicial do celular | — |
+| #46 | Recuperar o acesso sem e-mail: redefinir senha em Acessos, primeiro acesso pela tela, `redefinir-senha-dono.cmd` | RNF01 |
 
 ## O que vamos fazer
 

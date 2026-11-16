@@ -48,6 +48,7 @@ import java.security.SecureRandom;
  * <pre>
  *   POST /auth/login, telas do frontend          qualquer um
  *   esqueci a senha, opções do login (#42)       qualquer um
+ *   primeiro acesso (#46)                        qualquer um, só sem usuários e só do próprio computador
  *   /auth/** (quem sou eu, trocar senha)         qualquer usuário logado
  *   /relatorios/**, /usuarios/**                 ADMIN
  *   GET /agendas e /agendas/{id}                 qualquer usuário logado (o PROFISSIONAL só vê as dele)
@@ -71,7 +72,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/esqueci-senha", "/auth/redefinir-senha").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/esqueci-senha", "/auth/redefinir-senha", "/auth/primeiro-acesso").permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/opcoes").permitAll()
                         .requestMatchers(TELAS).permitAll()
                         .requestMatchers("/auth/**").authenticated()

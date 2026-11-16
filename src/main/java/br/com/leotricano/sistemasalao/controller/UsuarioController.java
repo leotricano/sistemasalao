@@ -1,6 +1,7 @@
 package br.com.leotricano.sistemasalao.controller;
 
 import br.com.leotricano.sistemasalao.config.UsuarioLogado;
+import br.com.leotricano.sistemasalao.dto.NovaSenhaRequest;
 import br.com.leotricano.sistemasalao.dto.NovoUsuarioRequest;
 import br.com.leotricano.sistemasalao.dto.UsuarioResponse;
 import br.com.leotricano.sistemasalao.service.UsuarioService;
@@ -37,6 +38,16 @@ public class UsuarioController {
     @PostMapping
     public UsuarioResponse criar(@Valid @RequestBody NovoUsuarioRequest dados) {
         return usuarioService.criar(dados);
+    }
+
+    /**
+     * {@code PUT /usuarios/{id}/senha} → {@code {"novaSenha":"..."}}; o administrador cria uma senha
+     * nova para quem esqueceu a dele (#46). 204, ou 404 se o usuário não existir.
+     */
+    @PutMapping("/{id}/senha")
+    public ResponseEntity<Void> redefinirSenha(@PathVariable Long id, @Valid @RequestBody NovaSenhaRequest dados) {
+        usuarioService.redefinirSenha(id, dados.novaSenha());
+        return ResponseEntity.noContent().build();
     }
 
     /** {@code DELETE /usuarios/{id}} → remove o acesso; 204, 404 se não existir, 400 se for o próprio. */

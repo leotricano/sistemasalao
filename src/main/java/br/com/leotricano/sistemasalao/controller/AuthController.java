@@ -5,17 +5,22 @@ import br.com.leotricano.sistemasalao.dto.AtualizarContaRequest;
 import br.com.leotricano.sistemasalao.dto.EsqueciSenhaRequest;
 import br.com.leotricano.sistemasalao.dto.LoginRequest;
 import br.com.leotricano.sistemasalao.dto.LoginResponse;
+import br.com.leotricano.sistemasalao.dto.PrimeiroAcessoRequest;
 import br.com.leotricano.sistemasalao.dto.RedefinirSenhaRequest;
 import br.com.leotricano.sistemasalao.dto.TrocarSenhaRequest;
 import br.com.leotricano.sistemasalao.dto.UsuarioResponse;
+import br.com.leotricano.sistemasalao.exception.AcessoNegadoException;
 import br.com.leotricano.sistemasalao.service.RecuperacaoSenhaService;
 import br.com.leotricano.sistemasalao.service.UsuarioService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Map;
 
 /**
@@ -47,7 +52,34 @@ public class AuthController {
      */
     @GetMapping("/opcoes")
     public Map<String, Boolean> opcoes() {
-        return Map.of("recuperacaoPorEmail", recuperacaoSenhaService.emailConfigurado());
+        return Map.of("recuperacaoPorEmail", recuperacaoSenhaService.emailConfigurado(),
+                "primeiroAcesso", usuarioService.semUsuarios()); // #46: mostra a tela "Criar a conta do dono"
+    }
+
+    /**
+     * {@code POST /auth/primeiro-acesso} → {@code {"nome","login","senha"}}; cria a conta do dono e
+     * já entra (#46). Só funciona enquanto o sistema não tem nenhum usuário, e só pedido do próprio
+     * computador onde o sistema roda (endereço 127.0.0.1): assim ninguém na rede do salão, ou de
+     * fora, consegue se adiantar e virar "dono" de um sistema recém-instalado.
+     *
+     * @throws AcessoNegadoException (403) se o pedido vier de outro aparelho
+     */
+    @PostMapping("/primeiro-acesso")
+    public LoginResponse primeiroAcesso(@Valid @RequestBody PrimeiroAcessoRequest dados, HttpServletRequest requisicao) {
+        if (!doProprioComputador(requisicao)) {
+            throw new AcessoNegadoException(
+                    "A conta do dono só pode ser criada no computador onde o sistema está instalado. Abra http://localhost:8080 nele.");
+        }
+        usuarioService.criarPrimeiroAdministrador(dados.nome(), dados.login(), dados.senha());
+        return usuarioService.entrar(new LoginRequest(dados.login(), dados.senha(), true));
+    }
+
+    private static boolean doProprioComputador(HttpServletRequest requisicao) {
+        try {
+            return InetAddress.getByName(requisicao.getRemoteAddr()).isLoopbackAddress();
+        } catch (UnknownHostException e) {
+            return false;
+        }
     }
 
     /**
