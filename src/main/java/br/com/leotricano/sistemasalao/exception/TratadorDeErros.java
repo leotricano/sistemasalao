@@ -37,6 +37,7 @@ import java.util.stream.Collectors;
  *   <tr><td>HttpMessageNotReadableException</td><td>400</td><td>JSON malformado ou tipo errado</td></tr>
  *   <tr><td>MethodArgumentTypeMismatchException</td><td>400</td><td>parâmetro de URL com valor inválido</td></tr>
  *   <tr><td>MissingServletRequestParameterException</td><td>400</td><td>parâmetro de URL obrigatório ausente</td></tr>
+ *   <tr><td>NaoAutenticadoException</td><td>401</td><td>login ou senha errados (#18)</td></tr>
  *   <tr><td>ConflitoHorarioException</td><td>409</td><td>profissional já ocupado no horário</td></tr>
  *   <tr><td>DataIntegrityViolationException</td><td>409</td><td>apagar algo que está em uso</td></tr>
  *   <tr><td>qualquer outra</td><td>500</td><td>erro inesperado (detalhe só no log)</td></tr>
@@ -52,6 +53,12 @@ public class TratadorDeErros {
     @ExceptionHandler(RecursoNaoEncontradoException.class)
     public ResponseEntity<ErroResponse> tratarNaoEncontrado(RecursoNaoEncontradoException e) {
         return responder(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    /** Login ou senha errados → 401 (#18). */
+    @ExceptionHandler(NaoAutenticadoException.class)
+    public ResponseEntity<ErroResponse> tratarNaoAutenticado(NaoAutenticadoException e) {
+        return responder(HttpStatus.UNAUTHORIZED, e.getMessage());
     }
 
     /** Regra do salão violada → 400. */
