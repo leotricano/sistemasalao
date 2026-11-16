@@ -47,6 +47,7 @@ import java.security.SecureRandom;
  * <p><b>Quem pode o quê</b> (a primeira regra que combinar com a requisição vale):
  * <pre>
  *   POST /auth/login, telas do frontend          qualquer um
+ *   esqueci a senha, opções do login (#42)       qualquer um
  *   /auth/** (quem sou eu, trocar senha)         qualquer usuário logado
  *   /relatorios/**, /usuarios/**                 ADMIN
  *   GET /agendas e /agendas/{id}                 qualquer usuário logado (o PROFISSIONAL só vê as dele)
@@ -69,7 +70,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/esqueci-senha", "/auth/redefinir-senha").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/opcoes").permitAll()
                         .requestMatchers(TELAS).permitAll()
                         .requestMatchers("/auth/**").authenticated()
                         .requestMatchers("/relatorios/**", "/usuarios/**").hasRole("ADMIN")
