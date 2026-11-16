@@ -8,7 +8,7 @@ API REST em Spring Boot para agendamento, histórico de clientes e controle de p
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 16/11/2026 (MVP, Tarefa 4):** cadastros, agendamento com vários serviços, bloqueio de conflito de horário, cancelar e remarcar, consulta da agenda, histórico do cliente, pagamentos e relatório de faturamento funcionam. Todo erro volta com status HTTP correto e mensagem em português. A API tem 29 testes automatizados (unidade e integração) e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: vários serviços começando pelo profissional (#28), especialidade com pacote (#29), autenticação (#18) e frontend.
+**Situação em 16/11/2026 (MVP, Tarefa 4):** cadastros, agendamento com vários serviços, bloqueio de conflito de horário, cancelar e remarcar, consulta da agenda, histórico do cliente, pagamentos e relatório de faturamento funcionam. Todo erro volta com status HTTP correto e mensagem em português. A API tem login com perfis e 35 testes automatizados (unidade e integração) e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: vários serviços começando pelo profissional (#28), especialidade com pacote (#29) e frontend.
 
 ---
 
@@ -44,6 +44,11 @@ CREATE DATABASE sistemasalao;
 |---|---|---|
 | `DB_PASSWORD` | sim | — |
 | `DB_USERNAME` | não | `postgres` |
+| `JWT_SECRET` | recomendada | sem ela, uma chave é sorteada a cada início e todos precisam entrar de novo depois de reiniciar |
+| `ADMIN_LOGIN` | não | `admin` |
+| `ADMIN_SENHA` | não | sem ela, a senha do primeiro administrador é sorteada e aparece **uma vez** no console |
+
+`JWT_SECRET` é uma frase longa e aleatória que assina os tokens de login; quem a conhece consegue criar tokens, então ela não vai para o Git. `ADMIN_LOGIN` e `ADMIN_SENHA` só são usadas quando o banco ainda não tem nenhum usuário.
 
 > Se criar a variável com o IntelliJ aberto, feche e abra de novo: programas só leem variáveis de ambiente ao iniciar.
 
@@ -73,7 +78,7 @@ Os testes **não precisam do PostgreSQL**: usam o banco H2 em memória, configur
 ./mvnw test
 ```
 
-O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 29, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
+O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 35, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
 
 | Classe | Tipo | O que testa |
 |---|---|---|
@@ -81,6 +86,7 @@ O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 29, Failures: 0, Errors: 0
 | `RelatorioServiceTest` | Unidade (Mockito) | Cálculos do relatório: totais, ticket médio, por profissional e por forma de pagamento |
 | `PagamentoServiceTest` | Unidade (Mockito) | Valor positivo e pagamento da agenda certa |
 | `RotasPrincipaisTest` | Integração (MockMvc + H2) | As rotas de ponta a ponta: cadastros, agendamento, 409, pagamento, conclusão, relatório, histórico e erros 400/404/409 |
+| `SegurancaTest` | Integração (MockMvc + H2) | Login real com token, 401 sem token ou com token adulterado, 403 por perfil, profissional vendo só a própria agenda, troca de senha |
 | `SistemasalaoApplicationTests` | Integração | A aplicação sobe |
 
 Nos testes de unidade, os repositórios são *mocks* (objetos falsos do Mockito) e só a regra do service é testada. Nos de integração, a aplicação sobe inteira e as requisições passam por controller, service, repositório e banco. As entidades têm construtor `protected`, então os testes criam objetos pela classe `Fabrica`, que fica no mesmo pacote `model` dentro de `src/test`.
@@ -134,8 +140,16 @@ erDiagram
 
 ## Endpoints
 
+Todas as rotas, menos `POST /auth/login`, exigem o cabeçalho `Authorization: Bearer <token>` (ver [Login e perfis](#login-e-perfis-18)). Sem token, a resposta é `401`; com um perfil sem permissão, `403`.
+
 | Método | Rota | O que faz |
 |---|---|---|
+| POST | `/auth/login` | Entra com `{"login":"...","senha":"..."}` e recebe o token |
+| GET | `/auth/me` | Dados de quem está logado |
+| PUT | `/auth/senha` | Troca a própria senha (`{"senhaAtual":"...","novaSenha":"..."}`) |
+| GET | `/usuarios` | Lista os acessos (ADMIN) |
+| POST | `/usuarios` | Cria um acesso (ADMIN) |
+| DELETE | `/usuarios/{id}` | Remove um acesso (ADMIN) |
 | GET | `/clientes` | Lista clientes |
 | POST | `/clientes` | Cadastra cliente |
 | PUT | `/clientes/{id}` | Atualiza cliente |
@@ -163,6 +177,18 @@ erDiagram
 | POST | `/agendas/{id}/pagamentos?valor=&formaPagamento=` | Registra pagamento |
 | DELETE | `/agendas/{id}/pagamentos/{pagamentoId}` | Remove pagamento |
 | GET | `/relatorios/faturamento?de=&ate=&profissionalId=` | Relatório de faturamento do período (ver [Relatório de faturamento](#relatório-de-faturamento-17)) |
+
+### Login e perfis (#18)
+
+O login devolve um **token JWT** válido por 12 horas. O frontend guarda o token e o manda em toda requisição. A API não guarda sessão: a assinatura do token prova quem é a pessoa e qual o perfil dela. As senhas são gravadas só como hash **BCrypt**.
+
+| Perfil | Quem é | Pode |
+|---|---|---|
+| `ADMIN` | Dono do salão | Tudo, incluindo relatório de faturamento, cadastro de serviços e profissionais e os acessos |
+| `RECEPCAO` | Recepção | Agenda, clientes, pagamentos; **não** vê o faturamento nem altera serviços, profissionais e acessos |
+| `PROFISSIONAL` | Cabeleireiro, manicure... | Só consulta **a própria agenda**: o filtro `profissionalId` é forçado para o dele, e agenda de outro dá 404 |
+
+**Primeiro acesso:** se o banco não tem nenhum usuário, o sistema cria o administrador ao subir (login `ADMIN_LOGIN`, senha `ADMIN_SENHA` ou sorteada e mostrada no console). Troque a senha no primeiro acesso.
 
 ### Respostas de erro
 
@@ -317,6 +343,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 | #31 | Estratégia de branches (GitHub Flow) e proteção da `master` com ruleset | — |
 | #17 | Relatório de faturamento por período e profissional | RF07 |
 | #26 | Testes automatizados: unidade (JUnit + Mockito) e integração das rotas (MockMvc + H2) | — |
+| #18 | Login com token JWT e perfis ADMIN, RECEPCAO e PROFISSIONAL; profissional vê só a própria agenda | RNF01 |
 
 ## O que vamos fazer
 
@@ -334,7 +361,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 
 ### Sprint 3 (10/11 a 16/11)
 - [x] **#17** Relatório de faturamento por período e profissional (RF07)
-- [ ] **#18** Autenticação e perfis: administrador e profissional (RNF01)
+- [x] **#18** Autenticação e perfis: administrador e profissional (RNF01)
 - [ ] **#30** Exportar relatório para Excel (RF10)
 
 ### Sprint 4 (17/11 a 30/11)
@@ -399,7 +426,8 @@ O PR exige **0 aprovações** porque o projeto tem um único desenvolvedor; o PR
 | **DTOs (records) nas respostas** | Entidades se referenciam nos dois sentidos (agenda ↔ itens, profissional ↔ serviços) e causavam recursão infinita no JSON. O DTO também entrega o dado pronto para a tela (ex.: `nomeCliente`, `total`) e permite mudar a entidade sem quebrar o frontend. |
 | **`BigDecimal` para dinheiro** | `double` tem erro de arredondamento em valores monetários. |
 | **`precoCobrado` no item** | Guarda o preço do dia do atendimento, independente de reajustes. |
-| **Security com `permitAll()`** | Temporário, para testar no Postman. A autenticação real é o card #18 (RNF01). |
+| **Login com JWT em vez de sessão** | O frontend é separado da API; o token vai no cabeçalho e a API não precisa guardar quem está logado. A chave fica em `JWT_SECRET`, fora do código. |
+| **Perfil RECEPCAO além de ADMIN e PROFISSIONAL** | A Tarefa 2 tem a persona Recepção: quem atende o balcão precisa agendar e receber, mas não precisa ver o faturamento do salão. |
 | **Conflito: a agenda inteira é um bloco** | Hoje a agenda tem um único horário de início. Os serviços acontecem em sequência, então todos os profissionais dela ficam ocupados do início ao fim. É conservador (uma manicure que só faz a última parte também fica bloqueada desde o início) e será refinado no #28. |
 | **Exceções + `@RestControllerAdvice`** | Os services lançam `RecursoNaoEncontradoException` (404), `RegraNegocioException` (400) ou `ConflitoHorarioException` (409) em vez de devolver `null`. O `TratadorDeErros` transforma cada uma na resposta certa, e os controllers ficam sem `if` nem try/catch. |
 | **Concluir sem pagamento é permitido** | O cliente pode pagar depois. Se o salão quiser exigir pagamento antes de concluir, é uma verificação a mais em `AgendaService.atualizarStatus`. |
