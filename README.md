@@ -115,9 +115,9 @@ O sistema roda num computador do salão, e os outros aparelhos (celular, tablet,
 
 **No computador do salão, uma vez:**
 1. Instale o **Java 21** e o **PostgreSQL 15** e crie o banco `sistemasalao` (ver "Como rodar").
-2. Crie as variáveis de ambiente do Windows: `DB_PASSWORD`, `JWT_SECRET` (uma frase longa e aleatória) e, se quiser escolher a senha inicial, `ADMIN_SENHA`.
+2. Crie as variáveis de ambiente do Windows (Painel de Controle → "Editar as variáveis de ambiente para sua conta"): `JAVA_HOME` (pasta do Java 21, ex.: `C:\Program Files\Java\jdk-21`), `DB_PASSWORD`, `JWT_SECRET` (uma frase longa e aleatória) e, se quiser escolher a senha inicial, `ADMIN_SENHA`. Feche e abra de novo as janelas do terminal depois de criar.
 3. Para gerar o sistema, instale também o **Node.js 20+** e rode `gerar-sistema.cmd`. Ele monta as telas, roda os testes e cria `target/sistemasalao-0.0.1-SNAPSHOT.jar`.
-4. Libere a porta 8080 no Firewall do Windows para a rede privada, se os outros aparelhos não conseguirem abrir.
+4. Libere a porta 8080 no Firewall do Windows para a rede privada, se os outros aparelhos não conseguirem abrir. Com uma VPN ligada (ex.: NordVPN), os aparelhos da rede local podem não enxergar o computador; nesse caso, permita o acesso à rede local nas configurações da VPN.
 
 **Todo dia:** rode `iniciar-sistema.cmd` e deixe a janela aberta. Acesse `http://localhost:8080` no próprio computador, ou `http://IP-DO-COMPUTADOR:8080` nos outros aparelhos (o IP aparece em `ipconfig`, "Endereço IPv4").
 
