@@ -13,4 +13,10 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     /** Usado ao cadastrar: impede dois usuários com o mesmo login. */
     boolean existsByLogin(String login);
+
+    /** "Esqueci minha senha" (#42): a pessoa pode informar o e-mail em vez do login. */
+    Optional<Usuario> findByEmailIgnoreCase(String email);
+
+    /** Impede dois usuários com o mesmo e-mail (#42). */
+    boolean existsByEmailIgnoreCase(String email);
 }

@@ -38,6 +38,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
+		<!-- Envio de e-mail: código de "esqueci minha senha" (#42) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
 		<!-- Login com token JWT (#18): gera o token no login e confere o token em cada requisição -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

@@ -2,7 +2,10 @@ package br.com.leotricano.sistemasalao.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
+
+import java.time.Instant;
 
 /**
  * Uma pessoa que entra no sistema com login e senha (#18). Tabela {@code usuario}.
@@ -40,6 +43,23 @@ public class Usuario {
      */
     @ManyToOne
     private Profissional profissional;
+
+    /** E-mail para receber o código de "esqueci minha senha" (#42). Opcional. */
+    @Email
+    @Column(unique = true)
+    private String email;
+
+    /**
+     * Código de recuperação de senha (#42), guardado só como hash BCrypt, igual à senha: quem
+     * olhar o banco não consegue usar o código. Fica {@code null} quando não há pedido em aberto.
+     */
+    private String codigoRecuperacaoHash;
+
+    /** Até quando o código vale (15 minutos depois do pedido). */
+    private Instant codigoRecuperacaoExpiraEm;
+
+    /** Tentativas erradas com o código atual; na 5ª o código é descartado. */
+    private Integer codigoRecuperacaoTentativas;
 
     /** Construtor vazio exigido pelo JPA. Público porque o UsuarioService cria usuários. */
     public Usuario() {}
@@ -92,5 +112,37 @@ public class Usuario {
 
     public void setProfissional(Profissional profissional) {
         this.profissional = profissional;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getCodigoRecuperacaoHash() {
+        return codigoRecuperacaoHash;
+    }
+
+    public void setCodigoRecuperacaoHash(String codigoRecuperacaoHash) {
+        this.codigoRecuperacaoHash = codigoRecuperacaoHash;
+    }
+
+    public Instant getCodigoRecuperacaoExpiraEm() {
+        return codigoRecuperacaoExpiraEm;
+    }
+
+    public void setCodigoRecuperacaoExpiraEm(Instant codigoRecuperacaoExpiraEm) {
+        this.codigoRecuperacaoExpiraEm = codigoRecuperacaoExpiraEm;
+    }
+
+    public Integer getCodigoRecuperacaoTentativas() {
+        return codigoRecuperacaoTentativas;
+    }
+
+    public void setCodigoRecuperacaoTentativas(Integer codigoRecuperacaoTentativas) {
+        this.codigoRecuperacaoTentativas = codigoRecuperacaoTentativas;
     }
 }

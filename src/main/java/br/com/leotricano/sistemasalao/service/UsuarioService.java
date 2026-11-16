@@ -102,6 +102,10 @@ public class UsuarioService {
         if (usuarioRepository.existsByLogin(login)) {
             throw new RegraNegocioException("Já existe um usuário com o login '" + login + "'.");
         }
+        String email = emailOuNulo(dados.email());
+        if (email != null && usuarioRepository.existsByEmailIgnoreCase(email)) {
+            throw new RegraNegocioException("Já existe um usuário com o e-mail '" + email + "'.");
+        }
 
         Profissional profissional = null;
         if (dados.perfil() == Perfil.PROFISSIONAL) {
@@ -115,6 +119,7 @@ public class UsuarioService {
         Usuario usuario = new Usuario();
         usuario.setNome(dados.nome().trim());
         usuario.setLogin(login);
+        usuario.setEmail(email);
         usuario.setSenhaHash(passwordEncoder.encode(dados.senha()));
         usuario.setPerfil(dados.perfil());
         usuario.setProfissional(profissional);
@@ -134,6 +139,25 @@ public class UsuarioService {
         }
         usuario.setSenhaHash(passwordEncoder.encode(novaSenha));
         usuarioRepository.save(usuario);
+    }
+
+    /**
+     * Cadastra, troca ou apaga (texto vazio) o e-mail de quem está logado (#42).
+     *
+     * @throws RegraNegocioException (400) se o e-mail já for de outro usuário
+     */
+    public UsuarioResponse atualizarEmail(Long usuarioId, String emailNovo) {
+        Usuario usuario = buscarEntidade(usuarioId);
+        String email = emailOuNulo(emailNovo);
+        if (email != null) {
+            usuarioRepository.findByEmailIgnoreCase(email)
+                    .filter(outro -> !outro.getId().equals(usuarioId))
+                    .ifPresent(outro -> {
+                        throw new RegraNegocioException("Já existe um usuário com o e-mail '" + email + "'.");
+                    });
+        }
+        usuario.setEmail(email);
+        return UsuarioResponse.from(usuarioRepository.save(usuario));
     }
 
     /**
@@ -165,6 +189,23 @@ public class UsuarioService {
     private Usuario buscarEntidade(Long id) {
         return usuarioRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário " + id + " não encontrado."));
+    }
+
+    /**
+     * E-mail em minúsculas e sem espaços nas pontas; texto vazio vira {@code null} (sem e-mail).
+     *
+     * @throws RegraNegocioException (400) se, depois de limpo, não tiver formato de e-mail
+     */
+    static String emailOuNulo(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        String limpo = email.trim().toLowerCase(Locale.ROOT);
+        // Formato simples: algo@algo.algo, sem espaços. A confirmação de verdade é o código chegar.
+        if (!limpo.matches("[^@\\s]+@[^@\\s]+\\.[^@\\s]+")) {
+            throw new RegraNegocioException("E-mail inválido: " + email.trim());
+        }
+        return limpo;
     }
 
     private static String normalizar(String login) {
