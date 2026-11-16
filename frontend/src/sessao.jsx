@@ -19,8 +19,9 @@ export function SessaoProvider({ children }) {
     })
   }, [])
 
-  async function entrar(login, senha) {
-    const resposta = await api('/auth/login', { metodo: 'POST', corpo: { login, senha } })
+  /** manterConectado (#43): o login vale 30 dias neste aparelho em vez de 12 horas. */
+  async function entrar(login, senha, manterConectado = false) {
+    const resposta = await api('/auth/login', { metodo: 'POST', corpo: { login, senha, manterConectado } })
     salvarSessao(resposta)
     setSessao(resposta)
   }
