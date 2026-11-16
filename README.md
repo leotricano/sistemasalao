@@ -143,6 +143,7 @@ erDiagram
 | GET | `/agendas/{id}/pagamentos` | Lista pagamentos do agendamento |
 | POST | `/agendas/{id}/pagamentos?valor=&formaPagamento=` | Registra pagamento |
 | DELETE | `/agendas/{id}/pagamentos/{pagamentoId}` | Remove pagamento |
+| GET | `/relatorios/faturamento?de=&ate=&profissionalId=` | Relatório de faturamento do período (ver [Relatório de faturamento](#relatório-de-faturamento-17)) |
 
 ### Respostas de erro
 
@@ -236,6 +237,32 @@ A API recebe um **período**, e não "dia" ou "semana": quem decide se a semana 
 
 A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDataHoraDescIdDesc`. O SQL é montado a partir do nome do método, sem `@Query`.
 
+### Relatório de faturamento (#17)
+
+`GET /relatorios/faturamento?de=2026-11-01&ate=2026-11-30` devolve o fechamento do período:
+
+```json
+{
+  "de": "2026-11-01", "ate": "2026-11-30", "profissionalId": null,
+  "atendimentos": 3, "clientesAtendidos": 2,
+  "faturamento": 340.00, "ticketMedio": 113.33, "totalRecebido": 300.00,
+  "porProfissional": [ { "profissionalId": 1, "nome": "William", "atendimentos": 2, "faturamento": 280.00 }, ... ],
+  "porFormaPagamento": [ { "formaPagamento": "DINHEIRO", "total": 0 }, { "formaPagamento": "CARTAO", "total": 100.00 }, { "formaPagamento": "PIX", "total": 200.00 } ]
+}
+```
+
+| Regra | Detalhe |
+|---|---|
+| Só agendas **CONCLUÍDAS** que começaram no período | Agendadas ainda não são faturamento; canceladas não aconteceram |
+| `faturamento` soma o `precoCobrado` dos serviços | É o valor do dia do atendimento, igual ao total do agendamento |
+| `totalRecebido` soma os pagamentos dessas agendas | Pode ser menor que o faturamento: concluir sem pagamento é permitido |
+| `ticketMedio` = faturamento ÷ atendimentos | 2 casas; `0.00` se não houve atendimento |
+| `&profissionalId=` | Conta só os serviços desse profissional; o recebido mostra os pagamentos das agendas em que ele atendeu (pagamento não é dividido por profissional) |
+| `porFormaPagamento` | Traz sempre as três formas, mesmo zeradas, pronto para a tabela e para o Excel (#30) |
+| Datas obrigatórias, `de` ≤ `ate`, até 366 dias | 400 |
+| Profissional que não existe | 404 |
+| Período sem atendimentos | 200, com tudo zerado |
+
 ### Regras de negócio já implementadas
 - Um item só é aceito se o profissional **faz** aquele serviço (vínculo em `profissional_servico`).
 - O preço do serviço é **copiado** para `precoCobrado` no momento do agendamento, para que um reajuste futuro não altere atendimentos antigos.
@@ -269,6 +296,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 | #15 | Consulta da agenda por período (dia, semana), profissional e status, em ordem de horário | RF04 |
 | #16 | Histórico de atendimentos do cliente, com resumo (atendimentos, último atendimento, total gasto) | RF06 |
 | #31 | Estratégia de branches (GitHub Flow) e proteção da `master` com ruleset | — |
+| #17 | Relatório de faturamento por período e profissional | RF07 |
 
 ## O que vamos fazer
 
@@ -285,7 +313,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 - [ ] **#29** Especialidade com pacote de serviços padrão (RF09)
 
 ### Sprint 3 (10/11 a 16/11)
-- [ ] **#17** Relatório de faturamento por período e profissional (RF07)
+- [x] **#17** Relatório de faturamento por período e profissional (RF07)
 - [ ] **#18** Autenticação e perfis: administrador e profissional (RNF01)
 - [ ] **#30** Exportar relatório para Excel (RF10)
 
