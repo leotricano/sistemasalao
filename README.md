@@ -8,7 +8,7 @@ Sistema web (API REST em Spring Boot + telas em React) para agendamento, histór
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 16/11/2026 (pronto para piloto no salão):** telas em React servidas pela própria API, login com perfis (dono, recepção e profissional), cadastros, agendamento com vários serviços e profissionais, bloqueio de conflito de horário, cancelar e remarcar, agenda do dia e da semana, histórico do cliente, pagamento com troco e relatório de faturamento com planilha. Todo erro volta com status HTTP correto e mensagem em português. A API tem 38 testes automatizados e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: ajustar o conflito de horário por profissional no backend (#28), especialidade com pacote de serviços (#29) e hospedagem na nuvem (#27).
+**Situação em 16/11/2026 (pronto para piloto no salão):** telas em React servidas pela própria API, login com perfis (dono, recepção e profissional), cadastros, agendamento com vários serviços e profissionais, bloqueio de conflito de horário, cancelar e remarcar, agenda do dia e da semana, histórico do cliente, pagamento com troco e relatório de faturamento com planilha. Todo erro volta com status HTTP correto e mensagem em português. A API tem 42 testes automatizados e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: ajustar o conflito de horário por profissional no backend (#28), especialidade com pacote de serviços (#29) e hospedagem na nuvem (#27).
 
 ---
 
@@ -49,6 +49,11 @@ CREATE DATABASE sistemasalao;
 | `ADMIN_LOGIN` | não | `admin` |
 | `ADMIN_SENHA` | não | sem ela, a senha do primeiro administrador é sorteada e aparece **uma vez** no console |
 
+| `MAIL_HOST` | não | sem ela, o "esqueci minha senha" fica desligado (ex.: `smtp.gmail.com`) |
+| `MAIL_USUARIO` | com `MAIL_HOST` | o e-mail do salão que envia o código |
+| `MAIL_SENHA` | com `MAIL_HOST` | no Gmail, uma **senha de app** (myaccount.google.com/apppasswords), não a senha normal |
+| `MAIL_PORTA` | não | `587` |
+
 `JWT_SECRET` é uma frase longa e aleatória que assina os tokens de login; quem a conhece consegue criar tokens, então ela não vai para o Git. `ADMIN_LOGIN` e `ADMIN_SENHA` só são usadas quando o banco ainda não tem nenhum usuário.
 
 > Se criar a variável com o IntelliJ aberto, feche e abra de novo: programas só leem variáveis de ambiente ao iniciar.
@@ -79,7 +84,7 @@ Os testes **não precisam do PostgreSQL**: usam o banco H2 em memória, configur
 ./mvnw test
 ```
 
-O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 38, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
+O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 42, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
 
 | Classe | Tipo | O que testa |
 |---|---|---|
@@ -88,6 +93,7 @@ O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 38, Failures: 0, Errors: 0
 | `PagamentoServiceTest` | Unidade (Mockito) | Valor positivo e pagamento da agenda certa |
 | `RotasPrincipaisTest` | Integração (MockMvc + H2) | As rotas de ponta a ponta: cadastros, agendamento, 409, pagamento, conclusão, relatório, histórico e erros 400/404/409 |
 | `SegurancaTest` | Integração (MockMvc + H2) | Login real com token, 401 sem token ou com token adulterado, 403 por perfil, profissional vendo só a própria agenda, troca de senha |
+| `RecuperacaoSenhaTest` | Integração (MockMvc + H2, e-mail simulado) | Código por e-mail, código errado, 5 tentativas, código usado não serve de novo, resposta igual para quem não existe, e-mail da própria conta |
 | `SistemasalaoApplicationTests` | Integração | A aplicação sobe |
 
 Nos testes de unidade, os repositórios são *mocks* (objetos falsos do Mockito) e só a regra do service é testada. Nos de integração, a aplicação sobe inteira e as requisições passam por controller, service, repositório e banco. As entidades têm construtor `protected`, então os testes criam objetos pela classe `Fabrica`, que fica no mesmo pacote `model` dentro de `src/test`.
@@ -187,6 +193,10 @@ Todas as rotas, menos `POST /auth/login`, exigem o cabeçalho `Authorization: Be
 | POST | `/auth/login` | Entra com `{"login":"...","senha":"..."}` e recebe o token |
 | GET | `/auth/me` | Dados de quem está logado |
 | PUT | `/auth/senha` | Troca a própria senha (`{"senhaAtual":"...","novaSenha":"..."}`) |
+| PUT | `/auth/me` | Cadastra ou troca o próprio e-mail (`{"email":"..."}`) |
+| GET | `/auth/opcoes` | Se o "esqueci minha senha" está ligado (aberta) |
+| POST | `/auth/esqueci-senha` | Manda o código por e-mail (`{"loginOuEmail":"..."}`, aberta) |
+| POST | `/auth/redefinir-senha` | Cria a senha nova com o código (`{"loginOuEmail","codigo","novaSenha"}`, aberta) |
 | GET | `/usuarios` | Lista os acessos (ADMIN) |
 | POST | `/usuarios` | Cria um acesso (ADMIN) |
 | DELETE | `/usuarios/{id}` | Remove um acesso (ADMIN) |
@@ -227,6 +237,8 @@ O login devolve um **token JWT** válido por 12 horas. O frontend guarda o token
 | `ADMIN` | Dono do salão | Tudo, incluindo relatório de faturamento, cadastro de serviços e profissionais e os acessos |
 | `RECEPCAO` | Recepção | Agenda, clientes, pagamentos; **não** vê o faturamento nem altera serviços, profissionais e acessos |
 | `PROFISSIONAL` | Cabeleireiro, manicure... | Só consulta **a própria agenda**: o filtro `profissionalId` é forçado para o dele, e agenda de outro dá 404 |
+
+**Esqueci minha senha (#42):** com o e-mail do salão configurado (`MAIL_HOST`, `MAIL_USUARIO`, `MAIL_SENHA`), a tela de login mostra "Esqueci minha senha". A pessoa informa o login ou o e-mail, recebe um código de 6 dígitos e cria uma senha nova. O código vale 15 minutos e aceita 5 tentativas, e é guardado só como hash. A resposta é a mesma exista ou não o usuário, para ninguém descobrir quem tem cadastro. O e-mail de cada pessoa é cadastrado pelo dono em "Acessos" ou pela própria pessoa em "Minha conta".
 
 **Primeiro acesso:** se o banco não tem nenhum usuário, o sistema cria o administrador ao subir (login `ADMIN_LOGIN`, senha `ADMIN_SENHA` ou sorteada e mostrada no console). Troque a senha no primeiro acesso.
 
@@ -389,6 +401,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 | #19 | Telas em React: login, menu por perfil, agenda do dia e da semana, novo agendamento no fluxo pedido pelo dono, detalhe do atendimento | RF03, RF04 |
 | #20 | Telas de clientes (com ficha e histórico), serviços e profissionais | RF01, RF02, RF06 |
 | #21 | Pagamento com troco e relatório de faturamento do mês com planilha para o Excel | RF05, RF07 |
+| #42 | Esqueci minha senha: código de 6 dígitos por e-mail | RNF01 |
 
 ## O que vamos fazer
 
