@@ -8,7 +8,7 @@ API REST em Spring Boot para agendamento, histórico de clientes e controle de p
 | Quadro de tarefas | https://github.com/users/leotricano/projects/1 |
 | Professor | Ricardo Pires Mesquita |
 
-**Situação em 16/11/2026 (MVP, Tarefa 4):** cadastros, agendamento com vários serviços, bloqueio de conflito de horário, cancelar e remarcar, consulta da agenda, histórico do cliente, pagamentos e relatório de faturamento funcionam. Todo erro volta com status HTTP correto e mensagem em português. A API tem login com perfis e 35 testes automatizados (unidade e integração) e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: vários serviços começando pelo profissional (#28), especialidade com pacote (#29) e frontend.
+**Situação em 16/11/2026 (MVP, Tarefa 4):** cadastros, agendamento com vários serviços, bloqueio de conflito de horário, cancelar e remarcar, consulta da agenda, histórico do cliente, pagamentos e relatório de faturamento funcionam. Todo erro volta com status HTTP correto e mensagem em português. A API tem login com perfis e 38 testes automatizados (unidade e integração) e o desenvolvimento segue o GitHub Flow, com a `master` protegida. Próximos: vários serviços começando pelo profissional (#28), especialidade com pacote (#29) e frontend.
 
 ---
 
@@ -78,7 +78,7 @@ Os testes **não precisam do PostgreSQL**: usam o banco H2 em memória, configur
 ./mvnw test
 ```
 
-O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 35, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
+O sinal de sucesso é `BUILD SUCCESS` com `Tests run: 38, Failures: 0, Errors: 0`. O resultado de cada classe fica em `target/surefire-reports/`.
 
 | Classe | Tipo | O que testa |
 |---|---|---|
@@ -315,6 +315,7 @@ A busca usa uma **consulta derivada** do Spring Data: `findByClienteIdOrderByDat
 - O total do agendamento é a soma de `precoCobrado` dos itens, e a duração total é a soma de `duracaoMinutos` dos serviços (ambos calculados no `AgendaResponse`).
 - **Conflito de horário (#12):** uma agenda ocupa todos os profissionais dela de `dataHora` até `dataHoraFim` (início + soma das durações). Incluir um serviço que faça algum desses profissionais ter outro atendimento sobreposto, não cancelado, é recusado com `409 Conflict` e uma mensagem como `"William já tem atendimento em 03/11/2026 das 14:00 às 17:00 (agenda 1, cliente Ana Paula)"`. Encostar (um termina às 14:00, outro começa às 14:00) é permitido.
 - Um pagamento precisa ter valor maior que zero, e só pode ser apagado pela agenda a que pertence.
+- A soma dos pagamentos de um agendamento **não passa do total** dele, e agendamento cancelado não recebe pagamento (#37). A mensagem diz quanto falta pagar.
 - Não é possível apagar cliente, serviço, profissional ou agenda que estejam sendo usados por outros registros (409).
 - A duração do serviço é obrigatória e precisa ser um número inteiro positivo de minutos; texto, zero ou negativo voltam `400 Bad Request`.
 
@@ -443,6 +444,5 @@ O PR exige **0 aprovações** porque o projeto tem um único desenvolvedor; o PR
 | Problema | Onde resolver |
 |---|---|
 | Numa agenda com vários profissionais, todos ficam bloqueados pelo tempo total, mesmo quem só atende uma parte | #28 |
-| A API aceita pagamentos acima do total do agendamento | sem card ainda |
 | A maioria das entradas (`@RequestBody`) ainda recebe entidades; só o remarcar já usa DTO de entrada (`RemarcarRequest`) | DTOs de entrada, sem card ainda |
 | Mudanças de esquema do banco são feitas com SQL manual | Flyway, sem card ainda |

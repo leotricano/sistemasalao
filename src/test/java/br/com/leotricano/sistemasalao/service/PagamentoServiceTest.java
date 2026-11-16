@@ -5,6 +5,7 @@ import br.com.leotricano.sistemasalao.exception.RegraNegocioException;
 import br.com.leotricano.sistemasalao.model.*;
 import br.com.leotricano.sistemasalao.repository.AgendaRepository;
 import br.com.leotricano.sistemasalao.repository.PagamentoRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,10 +35,18 @@ class PagamentoServiceTest {
     private final Agenda agenda = Fabrica.agenda(1L, Fabrica.cliente(1L, "Ana"),
             LocalDateTime.of(2030, 3, 10, 14, 0), StatusAgendamento.AGENDADO);
 
+    /** A agenda tem um corte de R$ 80: é o total que os pagamentos não podem passar. */
+    @BeforeEach
+    void incluirServico() {
+        Servico corte = Fabrica.servico(10L, "Corte", 60, "80.00");
+        Fabrica.item(100L, agenda, corte, Fabrica.profissional(20L, "William", corte));
+    }
+
     @Test
     @DisplayName("Registra pagamento com a data e hora do servidor")
     void registraPagamento() {
         when(agendaRepository.findById(1L)).thenReturn(Optional.of(agenda));
+        when(pagamentoRepository.findByAgendaId(1L)).thenReturn(List.of());
         when(pagamentoRepository.save(any(Pagamento.class))).thenAnswer(chamada -> chamada.getArgument(0));
 
         Pagamento pagamento = pagamentoService.registrar(1L, new BigDecimal("80.00"), FormaPagamento.PIX);
@@ -56,6 +66,42 @@ class PagamentoServiceTest {
         assertThatThrownBy(() -> pagamentoService.registrar(1L, new BigDecimal("-10"), FormaPagamento.PIX))
                 .isInstanceOf(RegraNegocioException.class);
         verify(pagamentoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Aceita pagamento dividido até completar o total")
+    void aceitaPagamentoDivididoAteOTotal() {
+        when(agendaRepository.findById(1L)).thenReturn(Optional.of(agenda));
+        when(pagamentoRepository.findByAgendaId(1L))
+                .thenReturn(List.of(Fabrica.pagamento(1L, agenda, "50.00", FormaPagamento.PIX)));
+        when(pagamentoRepository.save(any(Pagamento.class))).thenAnswer(chamada -> chamada.getArgument(0));
+
+        Pagamento resto = pagamentoService.registrar(1L, new BigDecimal("30.00"), FormaPagamento.CARTAO);
+
+        assertThat(resto.getValor()).isEqualByComparingTo("30.00");
+    }
+
+    @Test
+    @DisplayName("Recusa pagamento que passa do total do atendimento (400, #37)")
+    void recusaPagamentoAcimaDoTotal() {
+        when(agendaRepository.findById(1L)).thenReturn(Optional.of(agenda));
+        when(pagamentoRepository.findByAgendaId(1L))
+                .thenReturn(List.of(Fabrica.pagamento(1L, agenda, "50.00", FormaPagamento.PIX)));
+
+        assertThatThrownBy(() -> pagamentoService.registrar(1L, new BigDecimal("30.01"), FormaPagamento.CARTAO))
+                .isInstanceOf(RegraNegocioException.class)
+                .hasMessageContaining("falta: R$ 30");
+        verify(pagamentoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Agendamento cancelado não recebe pagamento (400)")
+    void canceladoNaoRecebePagamento() {
+        agenda.setStatus(StatusAgendamento.CANCELADO);
+        when(agendaRepository.findById(1L)).thenReturn(Optional.of(agenda));
+
+        assertThatThrownBy(() -> pagamentoService.registrar(1L, new BigDecimal("10"), FormaPagamento.PIX))
+                .isInstanceOf(RegraNegocioException.class);
     }
 
     @Test
